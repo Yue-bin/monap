@@ -15,7 +15,7 @@ OthersPeerInfo.Endpoint = "example.com:23333"                             --m
 YourPeerInfo = {}
 YourPeerInfo.PrivateKey = "01234567890123456789012345678901234567890123"
 YourPeerInfo.IP = "172.16.254.254"
-YourPeerInfo.Port = "23333" --m
+YourPeerInfo.Port = "23333"                                               --m
 
 --If your conf is not at following palces,change it
 WGconf = string.format("/etc/wireguard/%s.conf", OthersPeerInfo.Peername)
@@ -77,12 +77,6 @@ function GenPU()
     conf:close()
 end
 
---restart services
-function ReSvc()
-    os.execute("service bird restart")
-    os.execute("service wg-quick-op restart")
-end
-
 --the main
 ---[[
 print("Generating conf of wireguard...\n")
@@ -93,11 +87,10 @@ print("Modifying conf of wg-quick-op...\n")
 ModWQO()
 print("Generating log of port using...\nThe file is at ", PUconf, "\n")
 GenPU()
-print("Now restart services")
-for i = 1, 3, 1 do
-    ReSvc()
-end
+print("Now apply the confs\n")
+os.execute(string.format("wg-quick-op up %s", OthersPeerInfo.Peername))
 os.execute(string.format("wg-quick-op bounce %s", OthersPeerInfo.Peername))
+os.execute("birdc c")
 os.execute(string.format("wg show %s", OthersPeerInfo.Peername))
 os.execute("birdc s p")
 --]]
