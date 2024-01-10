@@ -3,7 +3,11 @@
 --	Athor: Moncak
 --]]
 
---when using this to peer, just modify the lines marked as "m"
+
+--peerinfos
+--Notice: all IP here are the tunnel IP
+--when using this to init, all the peerinfos shloud be modified
+--when using this to peer and not the first time using this, just modify the lines marked as "m"
 OthersPeerInfo = {
     Peername = "abc",                                           --m
     ASN = "4211110000",                                         --m
@@ -14,8 +18,11 @@ OthersPeerInfo = {
 
 --your PeerInfo, dont forget remove it when copy this script to others
 YourPeerInfo = {
+    ASN = "4211110001",
     PrivateKey = "01234567890123456789012345678901234567890123",
-    IP = "172.16.254.254",
+    PublicKey = "01234567890123456789012345678901234567890123",
+    IP = "172.16.254.254",  
+    Endpoint = "example.com",                                    
     Port = "23333",                                             --m
 }
 
@@ -34,16 +41,3 @@ Confs.Birdconf = "bird.conf"
 Confs.WQOconf = "wg-quick-op.yaml"
 Confs.PUconf = "port_using.log"
 --]]
-
-
---Help functions
---Test if the given file is exists
-function TestFile(file)
-    local f=io.open(file, "r")
-    if f~=nil then 
-        io.close(f) 
-        return true 
-    else 
-        return false 
-    end
-end
