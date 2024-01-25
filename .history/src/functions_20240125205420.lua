@@ -182,7 +182,7 @@ function GenBird()
         "    export none;\n",
         "}\n\n",
         "protocol bgp collect_self {\n",
-        "    local as ", YourPeerInfo.ASN, ";\n",
+        "    local as ",YourPeerInfo.ASN,";\n",
         "    neighbor 172.16.255.1 as 4211110101;\n",
         "    multihop;\n",
         "    ipv4 {\n",

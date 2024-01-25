@@ -127,7 +127,6 @@ function GenBird()
     --write the conf
     ---[[
     local conf = io.open(Confs.Birdconf, "w")
-    --全抄的dn11 wiki
     conf:write(
         "log syslog all;\n",
         "debug protocols all;\n\n",
@@ -180,23 +179,6 @@ function GenBird()
         "        accept;\n",
         "    };\n",
         "    export none;\n",
-        "}\n\n",
-        "protocol bgp collect_self {\n",
-        "    local as ", YourPeerInfo.ASN, ";\n",
-        "    neighbor 172.16.255.1 as 4211110101;\n",
-        "    multihop;\n",
-        "    ipv4 {\n",
-        "        add paths tx;\n",
-        "        # 修改为你的 BGP Table",
-        "        table BGP_table;\n",
-        "        import none;\n",
-        "        # 如果你使用 protocol static 宣告网段无需修改\n",
-        "        # 如果你使用重分发，自行修改过滤规则\n",
-        "        export filter {\n",
-        "            if source ~ [RTS_BGP,RTS_STATIC] then accept;\n",
-        "            reject;\n",
-        "        };\n",
-        "    };\n",
         "}\n\n",
         "# 从模板定义一个BGP邻居\n",
         "# protocol bgp protocol名称 from 模板名称\n",
