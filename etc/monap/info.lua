@@ -23,8 +23,8 @@ YourPeerInfo = {
     PublicKey = "01234567890123456789012345678901234567890123",
     IP = "172.16.254.254",
     IPSegment = "172.16.254.1/24",
-    Endpoint = "example.com",                                    
-    Port = "23333",                                             --m
+    Endpoint = "example.com",
+    Port = "23333", --m
 }
 
 --If your conf is not at following palces,change it
@@ -37,7 +37,7 @@ Confs = {
 }
 
 --just for test
---[[
+---[[
 os.execute("mkdir -p ./testconf")
 Confs.WGconf = "./testconf/wireguard/wg0.conf"
 Confs.Birdconf = "./testconf/bird.conf"
@@ -45,3 +45,6 @@ Confs.WQOconf = "./testconf/wg-quick-op.yaml"
 Confs.PUconf = "./testconf/port_using.log"
 Confs.WGDic = "./testconf/wireguard"
 --]]
+--YourPeerInfo = nil
+
+LOG_LEVEL = Loglevels.INFO
