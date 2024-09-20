@@ -10,16 +10,25 @@ local name = "monap"
 
 local usage = [[
 monap is a script for autopeer
-Usage: monap [COMMAND] [OPTIONS]
+Usage: monap [COMMAND] [NAME] [OPTIONS]
     Commands:
-        init: init the config file
         info: genarate the peerinfo
         peer: peer with others
+        restore: restore the config file save by monap
+        test: test the connection
+        show: show the status of the connection
+        install: install the monap and config file
+        uninstall: remove the monap and (optional) config file
     Options:
         -v, --version: output version information and exit
         -h, --help: output this help information and exit
+        -q, --quiet: quiet mode
         -c, --config <config-file>: specify the config file
         -i, --info <info-file>: specify the info file
+        -s, --suffix <suffix>: specify the suffix of the backup file
+        -p, --prefix <prefix>: specify the prefix of the install path
+    NAME:
+        the name of the peer
 ]]
 
 -- 搬了一点monlog,因为希望在单文件的情况下尽量减少依赖
@@ -72,7 +81,7 @@ local seach_path = {
     "/usr/local/",
     "./"
 }
-local ConfFile_name = "info.lua"
+local ConfFile_name = "config.lua"
 
 -- 输出帮助信息
 local function print_usage()
@@ -94,6 +103,15 @@ local function test_file(file)
     else
         return false
     end
+end
+
+-- 运行shell并返回结果
+local function run_shell(cmd)
+    log("running shell: " .. cmd, Loglevels.DEBUG)
+    local f = assert(io.popen(cmd, "r"))
+    local s = assert(f:read("*a"))
+    f:close()
+    return s
 end
 
 -- 搜索配置文件
@@ -118,9 +136,23 @@ local function search_conf()
     return path
 end
 
--- 初始化
-local function do_init()
-    print("init")
+-- 备份配置文件,不指定后缀则默认为bak
+local function backup(conf, suffix)
+    assert(type(suffix) == "nil" or type(suffix) == "string", "suffix must be a string")
+    assert(test_file(conf), "file not found")
+    if suffix == nil then
+        suffix = "bak"
+    end
+    os.execute(string.format("cp %s %s." .. suffix, conf, conf))
+end
+
+-- 处理全局类型的参数：只要存在参数就返回true
+local function find_global_option(argstr, opt)
+    if string.find(argstr, opt, 1, true) then
+        return true
+    else
+        return false
+    end
 end
 
 -- 生成peerinfo
@@ -141,17 +173,63 @@ local function do_peer()
     print("peer")
 end
 
+-- 恢复配置文件
+local function do_restore()
+    print("restore")
+end
+
+-- 测试连接
+local function do_test()
+    print("test")
+end
+
+-- 显示连接状态
+local function do_show()
+    print("show")
+end
+
+-- 安装monap
+local function do_install()
+    print("install")
+end
+
+-- 卸载monap
+local function do_uninstall()
+    print("uninstall")
+end
+
+
 -- 解析命令行参数
--- 先处理-h选项和输入为空的情况
-if not ... or string.find(..., "-h", 1, true) or string.find(..., "--help", 1, true) then
+-- 先处理输入为空的情况
+if not ... then
     print_usage()
     os.exit(255)
 end
 
+arg = { ... }
+-- 把参数拼接成字符串方便查找全局参数
+local argstr = ""
+for i = 1, #arg do
+    argstr = argstr .. arg[i]
+end
+
+-- 处理-h选项
+if find_global_option(argstr, "-h") or find_global_option(argstr, "--help") then
+    print_usage()
+    os.exit(0)
+end
+
 -- 再处理-v选项
-if string.find(..., "-v", 1, true) or string.find(..., "--version", 1, true) then
+if find_global_option(argstr, "-v") or find_global_option(argstr, "--version") then
     print_version()
     os.exit(0)
+end
+
+-- 处理-q选项
+if find_global_option(argstr, "-q") or find_global_option(argstr, "--quiet") then
+    NULL = io.open("/dev/null", "w")
+    io.stdout = NULL
+    io.stderr = NULL
 end
 
 -- 加载配置文件
@@ -159,12 +237,28 @@ ConfFile = search_conf()
 dofile(ConfFile)
 
 -- 再处理正常的COMMANDS,OPTIONS放到具体的函数中处理
-if arg[1] == "init" then
-    do_init()
-elseif arg[1] == "info" then
+--[[
+Commands:
+        info: genarate the peerinfo
+        peer: peer with others
+        restore: restore the config file save by monap
+        test: test the connection
+        show: show the status of the connection
+]]
+if arg[1] == "info" then
     do_info()
 elseif arg[1] == "peer" then
     do_peer()
+elseif arg[1] == "restore" then
+    do_restore()
+elseif arg[1] == "test" then
+    do_test()
+elseif arg[1] == "show" then
+    do_show()
+elseif arg[1] == "install" then
+    do_install()
+elseif arg[1] == "uninstall" then
+    do_uninstall()
 else
     io.stderr:write("unknown command or option: " .. arg[1] .. "\n")
     print_usage()
