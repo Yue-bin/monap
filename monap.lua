@@ -26,7 +26,7 @@ Usage: ]] .. name .. [[ [COMMAND] [NAME] [OPTIONS]
         -h, --help: output this help information and exit
         -q, --quiet: quiet mode
         -c, --config <config-file>: specify the config file
-        -i, --info <info-file>: specify the info file
+        -i, --info <info-str>: the info string genarated by info command
         -s, --suffix <suffix>: specify the suffix of the backup file (default: bak)
         --prefix <prefix>: specify the prefix of the install path (default: /)
         --log-level <level>: specify the log level
@@ -149,6 +149,13 @@ local function backup(conf, suffix)
     os.execute(string.format("cp %s %s." .. suffix, conf, conf))
 end
 
+-- 恢复配置文件
+local function restore(conf, suffix)
+    assert(type(suffix) == "nil" or type(suffix) == "string", "suffix must be a string")
+    assert(test_file(conf .. "." .. suffix), "backup file not found")
+    os.execute(string.format("cp %s.%s %s", conf, suffix, conf))
+end
+
 -- 处理全局类型的参数：只要存在参数就返回true
 local function find_global_option(argstr, opt)
     if string.find(argstr, opt, 1, true) then
@@ -244,7 +251,18 @@ end
 
 -- 恢复配置文件
 local function do_restore()
-    print("restore")
+    local suffix = find_option_with_value(arg, "-s") or find_option_with_value(arg, "--suffix") or "bak"
+    io.stdout:write("Do you want to restore the bird config file? [y/N]: ")
+    local answer = io.stdin:read()
+    if answer == "y" then
+        restore(ConfPaths.Birdconf, suffix)
+    end
+    io.stdout:write("\nDo you want to restore the wg-quick-op config file? [y/N]: ")
+    answer = io.stdin:read()
+    if answer == "y" then
+        restore(ConfPaths.WQOconf, suffix)
+    end
+    log("config file restored", Loglevels.INFO)
 end
 
 -- 测试连接
@@ -345,6 +363,7 @@ Commands:
         install: install the monap and config file
         uninstall: remove the monap and (optional) config file
 ]]
+print(arg[1])
 if arg[1] == "info" then
     do_info()
 elseif arg[1] == "peer" then
