@@ -141,8 +141,13 @@ end
 
 -- 备份配置文件,不指定后缀则默认为bak
 local function backup(conf, suffix)
-    assert(type(suffix) == "nil" or type(suffix) == "string", "suffix must be a string")
-    assert(test_file(conf), "file not found")
+    if type(suffix) ~= "nil" and type(suffix) ~= "string" then
+        log("suffix must be a string", Loglevels.ERROR)
+        os.exit(8)
+    end
+    if test_file(conf) then
+        log("file not found", Loglevels.ERROR)
+    end
     if suffix == nil then
         suffix = "bak"
     end
@@ -151,8 +156,13 @@ end
 
 -- 恢复配置文件
 local function restore(conf, suffix)
-    assert(type(suffix) == "nil" or type(suffix) == "string", "suffix must be a string")
-    assert(test_file(conf .. "." .. suffix), "backup file not found")
+    if type(suffix) ~= "nil" and type(suffix) ~= "string" then
+        log("suffix must be a string", Loglevels.ERROR)
+        os.exit(8)
+    end
+    if test_file(conf .. "." .. suffix) then
+        log("backup file not found", Loglevels.ERROR)
+    end
     os.execute(string.format("cp %s.%s %s", conf, suffix, conf))
 end
 
@@ -213,6 +223,46 @@ local function gen_port_using()
     return portlist
 end
 
+-- 解析info生成的peerinfo
+local function parse_info(info)
+    local peerinfo = {}
+    for line in info:gmatch("[^\r\n]+") do
+        -- 跳过包含 'Peerinfos:' 的行
+        if not line:find("Peerinfos:") then
+            local key, value = line:match("(%a+):(.+)")
+            if key and value then
+                peerinfo[key] = value
+            end
+        end
+    end
+    -- 检查是否有缺失的字段
+    if not peerinfo.ASN or not peerinfo.IP or not peerinfo.Endpoint or not peerinfo.PublicKey then
+        return nil
+    end
+    -- 检查字段常规合法性
+    -- ASN
+    -- dn11的ASN长度一般是10
+    if #peerinfo.ASN ~= 10 then
+        log("ASN length is not 10 , but " .. #peerinfo.ASN, Loglevels.WARN)
+    end
+    if peerinfo.ASN:match("[^%d]") then
+        log("ASN contains non-digit character", Loglevels.WARN)
+    end
+    -- IP
+    if not peerinfo.IP:match("%d+%.%d+%.%d+%.%d+") then
+        log("invalid IP in IPv4", Loglevels.WARN)
+    end
+    -- Endpoint
+    if not peerinfo.Endpoint:match("[%a%d%-%.]+:%d+") then
+        log("not a common Endpoint", Loglevels.WARN)
+    end
+    -- PublicKey
+    if #peerinfo.PublicKey ~= 44 then
+        log("PublicKey length is not 44 , but " .. #peerinfo.PublicKey, Loglevels.WARN)
+    end
+    return peerinfo
+end
+
 -- 生成peerinfo
 local function do_info()
     if not YourPeerInfo then
@@ -246,7 +296,21 @@ end
 
 -- 与其他peer建立连接
 local function do_peer()
-    print("peer")
+    local infostr = find_option_with_value(arg, "-i") or find_option_with_value(arg, "--info")
+    if not infostr then
+        log("please specify the info string by -i or --info option", Loglevels.ERROR)
+        os.exit(4)
+    end
+    local peerinfo = parse_info(infostr)
+    if not peerinfo then
+        log("invalid info string", Loglevels.ERROR)
+        os.exit(5)
+    end
+    log("peer with " .. arg[2] .. " with info", Loglevels.INFO)
+    log("ASN: " .. peerinfo.ASN, Loglevels.INFO)
+    log("IP: " .. peerinfo.IP, Loglevels.INFO)
+    log("Endpoint: " .. peerinfo.Endpoint, Loglevels.INFO)
+    log("PublicKey: " .. peerinfo.PublicKey, Loglevels.INFO)
 end
 
 -- 恢复配置文件
@@ -259,6 +323,7 @@ local function do_restore()
     end
     io.stdout:write("\nDo you want to restore the wg-quick-op config file? [y/N]: ")
     answer = io.stdin:read()
+    print(answer)
     if answer == "y" then
         restore(ConfPaths.WQOconf, suffix)
     end
@@ -346,10 +411,17 @@ if find_global_option(argstr, "-q") or find_global_option(argstr, "--quiet") the
     io.stderr = NULL
 end
 
+-- 处理--log-level选项
+LOG_LEVEL = find_option_with_value(arg, "--log-level") or LOG_LEVEL
+
 -- 加载配置文件
 -- 其实这里会有一个注入点存在，你可以直接往配置文件里狠狠注入
 -- 但是一般情况下配置文件不会被奇奇怪怪的人摸到吧）
-ConfFile = search_conf()
+ConfFile = find_option_with_value(arg, "-c") or find_option_with_value(arg, "--config") or search_conf()
+if not test_file(ConfFile) then
+    io.stderr:write("config file not found\n")
+    os.exit(2)
+end
 dofile(ConfFile)
 
 -- 再处理正常的COMMANDS,OPTIONS放到具体的函数中处理
@@ -363,7 +435,7 @@ Commands:
         install: install the monap and config file
         uninstall: remove the monap and (optional) config file
 ]]
-print(arg[1])
+--print(arg[1])
 if arg[1] == "info" then
     do_info()
 elseif arg[1] == "peer" then
