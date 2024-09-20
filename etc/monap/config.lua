@@ -38,6 +38,6 @@ ConfPaths.WGDic = "./testconf/wireguard"
 --]]
 --YourPeerInfo = nil
 
-LOG_LEVEL = Loglevels.INFO
+LOG_LEVEL = Loglevels.DEBUG
 
 -- config template

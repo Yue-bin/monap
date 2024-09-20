@@ -155,6 +155,20 @@ local function find_global_option(argstr, opt)
     end
 end
 
+-- 处理一般参数：参数和值都存在时才返回值，否则返回nil
+local function find_option(arg_table, opt)
+    for i = 1, #arg_table do
+        if arg_table[i] == opt then
+            if i + 1 <= #arg_table then
+                return arg_table[i + 1]
+            else
+                return nil
+            end
+        end
+    end
+    return nil
+end
+
 -- 生成peerinfo
 local function do_info()
     if not YourPeerInfo then
@@ -185,7 +199,9 @@ end
 
 -- 显示连接状态
 local function do_show()
-    print("show")
+    io.stdout:write("this function assume that all the interfaces is named " .. arg[2] .. "\n")
+    io.stdout:write(run_shell("wg show " .. arg[2]) .. "\n")
+    io.stdout:write(run_shell("birdc show protocol " .. arg[2]) .. "\n")
 end
 
 -- 安装monap
