@@ -69,3 +69,7 @@ luac.out
 *.old
 *.bak
 src/
+
+#test files
+test/
+testconf/

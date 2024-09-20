@@ -10,7 +10,7 @@ local name = "monap"
 
 local usage = [[
 monap is a script for autopeer
-Usage: monap [COMMAND] [NAME] [OPTIONS]
+Usage: ]] .. name .. [[ [COMMAND] [NAME] [OPTIONS]
     Commands:
         info: genarate the peerinfo
         peer: peer with others
@@ -19,16 +19,16 @@ Usage: monap [COMMAND] [NAME] [OPTIONS]
         show: show the status of the connection
         install: install the monap and config file
         uninstall: remove the monap and (optional) config file
+    NAME:
+        the name of the peer
     Options:
         -v, --version: output version information and exit
         -h, --help: output this help information and exit
         -q, --quiet: quiet mode
         -c, --config <config-file>: specify the config file
         -i, --info <info-file>: specify the info file
-        -s, --suffix <suffix>: specify the suffix of the backup file
-        -p, --prefix <prefix>: specify the prefix of the install path
-    NAME:
-        the name of the peer
+        -s, --suffix <suffix>: specify the suffix of the backup file (default: bak)
+        -p, --prefix <prefix>: specify the prefix of the install path (default: /)
 ]]
 
 -- 搬了一点monlog,因为希望在单文件的情况下尽量减少依赖
@@ -206,12 +206,35 @@ end
 
 -- 安装monap
 local function do_install()
-    print("install")
+    -- 解析prefix
+    local prefix = find_option(arg, "-p") or find_option(arg, "--prefix") or "/"
+    -- 安装bin
+    run_shell("mkdir -p " .. prefix .. "bin")
+    log("installing " .. name .. " to " .. prefix .. "bin/" .. name, Loglevels.INFO)
+    run_shell("cp " .. arg[0] .. " " .. prefix .. "bin/" .. name)
+    run_shell("chmod +x " .. prefix .. "bin/" .. name)
+    -- 安装conf
+    run_shell("mkdir -p " .. prefix .. conf_path)
+    log("installing " .. ConfFile .. " to " .. prefix .. conf_path .. ConfFile_name, Loglevels.INFO)
+    run_shell("cp " .. ConfFile .. " " .. prefix .. conf_path .. ConfFile_name)
 end
 
 -- 卸载monap
 local function do_uninstall()
-    print("uninstall")
+    -- 解析prefix
+    local prefix = find_option(arg, "-p") or find_option(arg, "--prefix") or "/"
+    -- 卸载bin
+    log("removing " .. name .. " from " .. prefix .. "bin/" .. name, Loglevels.INFO)
+    run_shell("rm " .. prefix .. "bin/" .. name)
+    -- 卸载conf
+    io.stdout:write("Do you want to remove the config file? [y/N]: ")
+    local answer = io.stdin:read()
+    if answer ~= "y" then
+        os.exit(0)
+    end
+    log("removing " .. prefix .. conf_path .. ConfFile_name .. " from " .. prefix .. conf_path .. ConfFile_name,
+        Loglevels.INFO)
+    run_shell("rm " .. prefix .. conf_path .. ConfFile_name)
 end
 
 
@@ -222,7 +245,9 @@ if not ... then
     os.exit(255)
 end
 
-arg = { ... }
+-- 兼容性起见还是取一下(不知道5.1以后还有没有)
+-- 我草你的这么搞没有arg[0]和负数索引了
+--arg = { ... }
 -- 把参数拼接成字符串方便查找全局参数
 local argstr = ""
 for i = 1, #arg do
@@ -260,6 +285,8 @@ Commands:
         restore: restore the config file save by monap
         test: test the connection
         show: show the status of the connection
+        install: install the monap and config file
+        uninstall: remove the monap and (optional) config file
 ]]
 if arg[1] == "info" then
     do_info()
