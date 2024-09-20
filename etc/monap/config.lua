@@ -14,8 +14,7 @@ YourPeerInfo = {
     PublicKey = "01234567890123456789012345678901234567890123",
     IP = "172.16.254.254",
     IPSegment = "172.16.254.1/24",
-    Endpoint = "example.com",
-    Port = "23333", --m
+    Endpoint = "example.com"
 }
 
 --If your conf is not at following palces,change it
@@ -38,6 +37,19 @@ ConfPaths.WGDic = "./testconf/wireguard"
 --]]
 --YourPeerInfo = nil
 
+--[[
+-- log levels
+    DEBUG
+    INFO
+    WARN
+    ERROR
+    FATAL
+--]]
 LOG_LEVEL = Loglevels.DEBUG
+
+-- port genarating method
+-- +: add 1 to the max inuse port
+-- -: sub 1 to the min inuse port
+PortGenMethod = "+"
 
 -- config template

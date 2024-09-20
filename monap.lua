@@ -28,7 +28,10 @@ Usage: ]] .. name .. [[ [COMMAND] [NAME] [OPTIONS]
         -c, --config <config-file>: specify the config file
         -i, --info <info-file>: specify the info file
         -s, --suffix <suffix>: specify the suffix of the backup file (default: bak)
-        -p, --prefix <prefix>: specify the prefix of the install path (default: /)
+        --prefix <prefix>: specify the prefix of the install path (default: /)
+        --log-level <level>: specify the log level
+            Loglevels: DEBUG INFO WARN ERROR FATAL
+        -p, --port <port>: specify the port
 ]]
 
 -- 搬了一点monlog,因为希望在单文件的情况下尽量减少依赖
@@ -53,7 +56,7 @@ LOG_LEVEL = Loglevels.DEBUG
 -- 输出日志到控制台
 local function log(msg, level)
     if level ~= nil then
-        assert((level >= loglevelmin and level <= loglevelmax), "level is valid")
+        assert((level >= loglevelmin and level <= loglevelmax), "level is invalid")
         if level < LOG_LEVEL then
             return false
         end
@@ -156,7 +159,7 @@ local function find_global_option(argstr, opt)
 end
 
 -- 处理一般参数：参数和值都存在时才返回值，否则返回nil
-local function find_option(arg_table, opt)
+local function find_option_with_value(arg_table, opt)
     for i = 1, #arg_table do
         if arg_table[i] == opt then
             if i + 1 <= #arg_table then
@@ -169,16 +172,68 @@ local function find_option(arg_table, opt)
     return nil
 end
 
+-- 从wg配置文件中获取port
+local function get_port_from_wgconf(conf)
+    local f = assert(io.open(conf, "r"))
+    if not f then
+        return nil
+    end
+    local port = nil
+    for line in f:lines() do
+        port = line:match("ListenPort = (%d+)")
+        if port then
+            break
+        end
+    end
+    f:close()
+    return port
+end
+
+-- 生成正在使用的端口列表
+local function gen_port_using()
+    local filelist = run_shell("ls " .. string.format(ConfPaths.WGconf_str, "*"))
+    local portlist = {}
+    if filelist then
+        for filename in filelist:gmatch("[^\r\n]+") do
+            local iname = filename:match(string.format(ConfPaths.WGconf_str, "(.*)"))
+            local port = get_port_from_wgconf(filename)
+            if port then
+                table.insert(portlist, { iname, port })
+            end
+        end
+    end
+    table.sort(portlist, function(a, b) return a[2] < b[2] end)
+    return portlist
+end
+
 -- 生成peerinfo
 local function do_info()
     if not YourPeerInfo then
         log("table \"YourPeerInfo\" not found in " .. ConfFile, Loglevels.ERROR)
         os.exit(126)
     end
+    local portlist = gen_port_using()
+    local port = find_option_with_value(arg, "-p") or find_option_with_value(arg, "--port")
+    if not port then
+        if portlist == {} then
+            log("no port in use, please specify the port", Loglevels.ERROR)
+            os.exit(6)
+        end
+        if #portlist > 0 then
+            if PortGenMethod == "+" then
+                port = portlist[#portlist][2] + 1
+            elseif PortGenMethod == "-" then
+                port = portlist[1][2] - 1
+            else
+                log("invalid PortGenMethod", Loglevels.ERROR)
+                os.exit(3)
+            end
+        end
+    end
     io.stdout:write("Peerinfos:\n")
     io.stdout:write("\t" .. "ASN:" .. YourPeerInfo.ASN .. "\n")
     io.stdout:write("\t" .. "IP:" .. YourPeerInfo.IP .. "\n")
-    io.stdout:write("\t" .. "Endpoint:" .. YourPeerInfo.Endpoint .. ":" .. YourPeerInfo.Port .. "\n")
+    io.stdout:write("\t" .. "Endpoint:" .. YourPeerInfo.Endpoint .. ":" .. port .. "\n")
     io.stdout:write("\t" .. "PublicKey:" .. YourPeerInfo.PublicKey .. "\n")
 end
 
@@ -207,7 +262,7 @@ end
 -- 安装monap
 local function do_install()
     -- 解析prefix
-    local prefix = find_option(arg, "-p") or find_option(arg, "--prefix") or "/"
+    local prefix = find_option_with_value(arg, "-p") or find_option_with_value(arg, "--prefix") or "/"
     -- 安装bin
     run_shell("mkdir -p " .. prefix .. "bin")
     log("installing " .. name .. " to " .. prefix .. "bin/" .. name, Loglevels.INFO)
@@ -222,7 +277,7 @@ end
 -- 卸载monap
 local function do_uninstall()
     -- 解析prefix
-    local prefix = find_option(arg, "-p") or find_option(arg, "--prefix") or "/"
+    local prefix = find_option_with_value(arg, "--prefix") or "/"
     -- 卸载bin
     log("removing " .. name .. " from " .. prefix .. "bin/" .. name, Loglevels.INFO)
     run_shell("rm " .. prefix .. "bin/" .. name)
@@ -274,6 +329,8 @@ if find_global_option(argstr, "-q") or find_global_option(argstr, "--quiet") the
 end
 
 -- 加载配置文件
+-- 其实这里会有一个注入点存在，你可以直接往配置文件里狠狠注入
+-- 但是一般情况下配置文件不会被奇奇怪怪的人摸到吧）
 ConfFile = search_conf()
 dofile(ConfFile)
 
