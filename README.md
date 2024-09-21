@@ -21,6 +21,7 @@ autopeer by moncak
 * 根据输入的peerinfo自动生成和修改相关的配置文件并执行`wg-quick-op up <name>`和`birdc configure`
 
   * 以及对输入的peerinfo进行一些基本的检查
+  * TODO: 更加智能的peerinfo识别，JSON格式peerinfo输入输出
 
 * (部分)支持旧版使用`wg-quick-op.yaml`配置文件的`wg-quick-op`
 
@@ -41,6 +42,10 @@ autopeer by moncak
   **当不存在正在使用的端口的时候必须手动指定**
 
 * 提供还原备份功能
+
+* 安装与卸载，可以指定可选的`--prefix`参数
+
+* TODO: 检查连接，自动化排障
 
 ## 用法
 
@@ -87,6 +92,41 @@ ASN:4211110001
 IP:172.16.254.254
 PublicKey:01234567890123456789012345678901234567890123
 ```
+
+DEMO：
+
+```shell
+╰─± ./monap.lua info -p 12345
+[INFO] config file found: ./etc/monap/config.lua
+Peerinfos:
+        ASN:4211110001
+        IP:172.16.254.254
+        Endpoint:example.com:12345
+        PublicKey:01234567890123456789012345678901234567890123
+
+╰─± ./monap.lua peer moncak -p 12345 -i "Peerinfos:
+        ASN:4211110001
+        IP:172.16.254.254
+        Endpoint:example.com:35018 
+        PublicKey:0123456789123456789012345678901234567890123"
+[INFO] config file found: ./etc/monap/config.lua
+[WARN] PublicKey length is not 44 , but 43
+[INFO] peer with moncak with info
+[INFO] ASN: 4211110001
+[INFO] IP: 172.16.254.254
+[INFO] Endpoint: example.com:35018
+[INFO] PublicKey: 0123456789123456789012345678901234567890123
+if the peer info is correct, press any key to continue, or press Ctrl+C to exit
+
+[INFO] generating wireguard config file
+[INFO] up the wireguard interface
+[INFO] modifying wg-quick-op config file
+[INFO] restarting wg-quick-op
+[INFO] modifying bird config file
+[INFO] reconfiguring bird
+```
+
+
 
 ## 依赖
 
