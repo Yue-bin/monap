@@ -101,7 +101,7 @@ DEMO：
 [INFO] installing monap to /usr/bin/monap
 [INFO] installing ./etc/monap/config.lua to /etc/monap/config.lua
 
-╰─± monap.lua uninstall
+╰─± monap uninstall
 [INFO] config file found: /etc/monap/config.lua
 [INFO] removing monap from /usr/bin/monap
 Do you want to remove the config file? [y/N]: y
