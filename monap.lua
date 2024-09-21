@@ -17,6 +17,7 @@ Usage: ]] .. name .. [[ [COMMAND] [NAME] [OPTIONS]
         restore: restore the config file save by monap
         test: test the connection
         show: show the status of the connection
+        showport: show the port in use
         install: install the monap and config file
         uninstall: remove the monap and (optional) config file
     NAME:
@@ -32,6 +33,9 @@ Usage: ]] .. name .. [[ [COMMAND] [NAME] [OPTIONS]
         --log-level <level>: specify the log level
             Loglevels: DEBUG INFO WARN ERROR FATAL
         -p, --port <port>: specify the port
+        --no-bird: do not operate bird and config file of bird
+        --no-wg: do not operate wireguard and config file of wireguard
+        --old-wg-quick-op: use the config file wg-quick-op.yaml
 ]]
 
 -- 搬了一点monlog,因为希望在单文件的情况下尽量减少依赖
@@ -151,6 +155,13 @@ local function backup(conf, suffix)
     if suffix == nil then
         suffix = "bak"
     end
+    if test_file(conf .. suffix) then
+        io.stdout:write("backup file already exists, do you want to overwrite it? [y/N]: ")
+        local answer = io.stdin:read()
+        if answer ~= "y" then
+            return
+        end
+    end
     os.execute(string.format("cp %s %s." .. suffix, conf, conf))
 end
 
@@ -166,9 +177,9 @@ local function restore(conf, suffix)
     os.execute(string.format("cp %s.%s %s", conf, suffix, conf))
 end
 
--- 处理全局类型的参数：只要存在参数就返回true
-local function find_global_option(argstr, opt)
-    if string.find(argstr, opt, 1, true) then
+-- 处理参数：只要存在参数就返回true
+local function find_option(arg_str, opt)
+    if string.find(arg_str, opt, 1, true) then
         return true
     else
         return false
@@ -197,7 +208,7 @@ local function get_port_from_wgconf(conf)
     end
     local port = nil
     for line in f:lines() do
-        port = line:match("ListenPort = (%d+)")
+        port = line:match("ListenPort%s*=%s*(%d+)")
         if port then
             break
         end
@@ -236,7 +247,7 @@ local function parse_info(info)
         end
     end
     -- 检查是否有缺失的字段
-    if not peerinfo.ASN or not peerinfo.IP or not peerinfo.Endpoint or not peerinfo.PublicKey then
+    if not peerinfo.ASN or not peerinfo.IP or not peerinfo.PublicKey then
         return nil
     end
     -- 检查字段常规合法性
@@ -249,11 +260,11 @@ local function parse_info(info)
         log("ASN contains non-digit character", Loglevels.WARN)
     end
     -- IP
-    if not peerinfo.IP:match("%d+%.%d+%.%d+%.%d+") then
+    if not peerinfo.IP:match("^%d+%.%d+%.%d+%.%d+$") then
         log("invalid IP in IPv4", Loglevels.WARN)
     end
     -- Endpoint
-    if not peerinfo.Endpoint:match("[%a%d%-%.]+:%d+") then
+    if not peerinfo.Endpoint:match("^[%a%d%-%.]+:%d+$") then
         log("not a common Endpoint", Loglevels.WARN)
     end
     -- PublicKey
@@ -263,16 +274,11 @@ local function parse_info(info)
     return peerinfo
 end
 
--- 生成peerinfo
-local function do_info()
-    if not YourPeerInfo then
-        log("table \"YourPeerInfo\" not found in " .. ConfFile, Loglevels.ERROR)
-        os.exit(126)
-    end
-    local portlist = gen_port_using()
+-- 获取可用端口
+local function get_port_available(portlist)
     local port = find_option_with_value(arg, "-p") or find_option_with_value(arg, "--port")
     if not port then
-        if portlist == {} then
+        if not portlist or #portlist < 1 then
             log("no port in use, please specify the port", Loglevels.ERROR)
             os.exit(6)
         end
@@ -287,6 +293,17 @@ local function do_info()
             end
         end
     end
+    return port
+end
+
+-- 生成peerinfo
+local function do_info()
+    if not YourPeerInfo then
+        log("table \"YourPeerInfo\" not found in " .. ConfFile, Loglevels.ERROR)
+        os.exit(126)
+    end
+    local portlist = gen_port_using()
+    local port = get_port_available(portlist)
     io.stdout:write("Peerinfos:\n")
     io.stdout:write("\t" .. "ASN:" .. YourPeerInfo.ASN .. "\n")
     io.stdout:write("\t" .. "IP:" .. YourPeerInfo.IP .. "\n")
@@ -296,6 +313,7 @@ end
 
 -- 与其他peer建立连接
 local function do_peer()
+    -- 读取info与预检查
     local infostr = find_option_with_value(arg, "-i") or find_option_with_value(arg, "--info")
     if not infostr then
         log("please specify the info string by -i or --info option", Loglevels.ERROR)
@@ -311,6 +329,86 @@ local function do_peer()
     log("IP: " .. peerinfo.IP, Loglevels.INFO)
     log("Endpoint: " .. peerinfo.Endpoint, Loglevels.INFO)
     log("PublicKey: " .. peerinfo.PublicKey, Loglevels.INFO)
+    io.stdout:write("if the peer info is correct, press any key to continue, or press Ctrl+C to exit\n")
+    local _ = io.stdin:read()
+    -- 生成wg配置文件
+    if not find_option(argstr, "--no-wg") then
+        log("generating wireguard config file", Loglevels.INFO)
+        local conf_file = string.format(ConfPaths.WGconf_str, arg[2])
+        local port = get_port_available(gen_port_using())
+        if test_file(conf_file) then
+            backup(conf_file)
+        end
+        local conf = io.open(conf_file, "w")
+        if not conf then
+            log("failed to open " .. conf_file, Loglevels.ERROR)
+        else
+            conf:write(GenWGConf(peerinfo, port))
+            conf:close()
+        end
+        -- up这个接口
+        log("up the wireguard interface", Loglevels.INFO)
+        run_shell("wg-quick-op up " .. arg[2])
+    end
+    -- 修改wg-quick-op配置文件
+    if find_option(argstr, "--old-wg-quick-op") or not OldWGOconf then
+        log("modifying wg-quick-op config file", Loglevels.INFO)
+        local conf_file = ConfPaths.WQOconf
+        if test_file(conf_file) then
+            backup(conf_file)
+        end
+        -- 这一段直接从旧版抄的，由于新版中已经失去了这个功能，所以我也不打算维护了
+        --read conf to string
+        local conf = io.open(ConfPaths.WQOconf, "r")
+
+        if not conf then
+            log("failed to open " .. conf_file, Loglevels.ERROR)
+        else
+            conf:seek("set", 0)
+            local conftext = conf:read("*a")
+            conf:close()
+
+            --find "enabled:" and insert peername
+            conftext = string.gsub(conftext, "enabled:", string.format("enabled:\n  - %s", arg[2]))
+            --find "iface:" insert peername
+            conftext = string.gsub(conftext, "iface:", string.format("iface:\n    - %s", arg[2]))
+
+            --write it to file
+            local conf = io.open(ConfPaths.WQOconf, "w")
+            if not conf then
+                log("failed to open " .. conf_file, Loglevels.ERROR)
+            else
+                conf:write(conftext)
+                conf:close()
+            end
+        end
+        -- 重启wg-quick-op
+        log("restarting wg-quick-op", Loglevels.INFO)
+        run_shell("service wg-quick-op restart")
+    end
+    -- 修改bird配置文件
+    if not find_option(argstr, "--no-bird") then
+        log("modifying bird config file", Loglevels.INFO)
+        local conf_file = ConfPaths.Birdconf
+        if test_file(conf_file) then
+            backup(conf_file)
+        end
+        local conf = io.open(conf_file, "a")
+        if not conf then
+            log("failed to open " .. conf_file, Loglevels.ERROR)
+        else
+            conf:write(GenBirdConf(arg[2], peerinfo))
+            conf:close()
+        end
+        -- 测试配置文件
+        --bird和birdc都没有-t选项，我有一些错误的记忆
+        --log("testing bird config file", Loglevels.INFO)
+        --run_shell("bird -t -c " .. conf_file)
+        -- 重启bird
+        log("reconfiguring bird", Loglevels.INFO)
+        run_shell("birdc configure")
+    end
+    -- TODO:修改防火墙把接口添加到dn11区域
 end
 
 -- 恢复配置文件
@@ -340,6 +438,14 @@ local function do_show()
     io.stdout:write("this function assume that all the interfaces is named " .. arg[2] .. "\n")
     io.stdout:write(run_shell("wg show " .. arg[2]) .. "\n")
     io.stdout:write(run_shell("birdc show protocol " .. arg[2]) .. "\n")
+end
+
+-- 显示端口使用情况
+local function do_showport()
+    local portlist = gen_port_using()
+    for _, v in pairs(portlist) do
+        print(v[1], v[2])
+    end
 end
 
 -- 安装monap
@@ -386,26 +492,27 @@ end
 -- 兼容性起见还是取一下(不知道5.1以后还有没有)
 -- 我草你的这么搞没有arg[0]和负数索引了
 --arg = { ... }
+
 -- 把参数拼接成字符串方便查找全局参数
-local argstr = ""
+argstr = ""
 for i = 1, #arg do
     argstr = argstr .. arg[i]
 end
 
 -- 处理-h选项
-if find_global_option(argstr, "-h") or find_global_option(argstr, "--help") then
+if find_option(argstr, "-h") or find_option(argstr, "--help") then
     print_usage()
     os.exit(0)
 end
 
 -- 再处理-v选项
-if find_global_option(argstr, "-v") or find_global_option(argstr, "--version") then
+if find_option(argstr, "-v") or find_option(argstr, "--version") then
     print_version()
     os.exit(0)
 end
 
 -- 处理-q选项
-if find_global_option(argstr, "-q") or find_global_option(argstr, "--quiet") then
+if find_option(argstr, "-q") or find_option(argstr, "--quiet") then
     NULL = io.open("/dev/null", "w")
     io.stdout = NULL
     io.stderr = NULL
@@ -432,6 +539,7 @@ Commands:
         restore: restore the config file save by monap
         test: test the connection
         show: show the status of the connection
+        showport: show the port in use
         install: install the monap and config file
         uninstall: remove the monap and (optional) config file
 ]]
@@ -446,6 +554,8 @@ elseif arg[1] == "test" then
     do_test()
 elseif arg[1] == "show" then
     do_show()
+elseif arg[1] == "showport" then
+    do_showport()
 elseif arg[1] == "install" then
     do_install()
 elseif arg[1] == "uninstall" then

@@ -20,20 +20,17 @@ YourPeerInfo = {
 --If your conf is not at following palces,change it
 ConfPaths = {
     WGconf_str = "/etc/wireguard/%s.conf",
-    Birdconf = "/etc/bird.conf",
+    --Birdconf = "/etc/bird.conf",
+    Birdconf = "/etc/bird/bgp.conf", -- 这玩意指向你的bgp在的bird配置文件
     WQOconf = "/etc/wg-quick-op.yaml",
-    PUconf = "/etc/wireguard/port_using.log",
-    WGDic = "/etc/wireguard"
 }
 
 --just for test
 ---[[
-os.execute("mkdir -p ./testconf")
-ConfPaths.WGconf = "./testconf/wireguard/wg0.conf"
+os.execute("mkdir -p ./testconf/wireguard")
+--ConfPaths.WGconf_str = "./testconf/wireguard/%s.conf"
 ConfPaths.Birdconf = "./testconf/bird.conf"
 ConfPaths.WQOconf = "./testconf/wg-quick-op.yaml"
-ConfPaths.PUconf = "./testconf/port_using.log"
-ConfPaths.WGDic = "./testconf/wireguard"
 --]]
 --YourPeerInfo = nil
 
@@ -52,4 +49,39 @@ LOG_LEVEL = Loglevels.DEBUG
 -- -: sub 1 to the min inuse port
 PortGenMethod = "+"
 
--- config template
+-- use old wg-quick-op conf
+-- dont use it with new version wg-quick-op with conf wg-quick-op.toml
+-- OldWGOconf = true
+
+-- config templates
+-- wg conf template
+-- 干李良的lua的语法糖忽略[[后第一个换行符我还得手动加上去
+function GenWGConf(peerinfo, port)
+    local conf = [[
+[Interface]
+PrivateKey = ]] .. YourPeerInfo.PrivateKey .. [[\n
+ListenPort = ]] .. port .. [[\n
+PostUp = /sbin/ip addr add dev %i ]] .. YourPeerInfo.IP .. [[/32 peer ]] .. peerinfo.IP .. [[/32
+Table = off
+MTU = 1388
+
+]] .. "[Peer]"
+    --if Endpoint is not empty, add it
+    if peerinfo.Endpoint ~= "" then
+        conf = conf .. "Endpoint = " .. peerinfo.Endpoint
+    end
+    conf = conf .. [[\n
+PublicKey = ]] .. peerinfo.PublicKey .. [[\n
+AllowedIPs = 10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16
+    ]]
+    return conf
+end
+
+-- bird conf template
+function GenBirdConf(name, peerinfo)
+    conf = [[
+protocol bgp ]] .. name .. [[ from BGP_peers {
+    neighbor ]] .. peerinfo.IP .. [[%]] .. name .. [[ as ]] .. peerinfo.ASN .. [[;
+}]]
+    return conf
+end
