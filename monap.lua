@@ -470,6 +470,7 @@ local function do_uninstall()
     -- 解析prefix
     local prefix = find_option_with_value(arg, "--prefix") or "/"
     io.stdout:write("Do you want to remove the config file? [y/N]: ")
+    io.stdout:flush()
     local answer = io.stdin:read()
     if answer == "y" then
         -- 卸载conf
