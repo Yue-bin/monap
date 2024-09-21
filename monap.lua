@@ -469,19 +469,20 @@ end
 local function do_uninstall()
     -- 解析prefix
     local prefix = find_option_with_value(arg, "--prefix") or "/"
+    io.stdout:write("Do you want to remove the config file? [y/N]: ")
+    local answer = io.stdin:read()
+    if answer == "y" then
+        -- 卸载conf
+        local conf_path_install = prefix .. conf_path .. ConfFile_name
+        log("removing " .. ConfFile_name .. " from " .. conf_path_install, Loglevels.INFO)
+        run_shell("rm " .. conf_path_install)
+    end
+    -- 我草你的Op的busybox不能自己删自己
+    --run_shell("rm " .. bin_path)
     -- 卸载bin
     local bin_path = prefix .. "usr/bin/" .. name
     log("removing " .. name .. " from " .. bin_path, Loglevels.INFO)
-    run_shell("rm " .. bin_path)
-    -- 卸载conf
-    io.stdout:write("Do you want to remove the config file? [y/N]: ")
-    local answer = io.stdin:read()
-    if answer ~= "y" then
-        os.exit(0)
-    end
-    local conf_path_install = prefix .. conf_path .. ConfFile_name
-    log("removing " .. ConfFile_name .. " from " .. conf_path_install, Loglevels.INFO)
-    run_shell("rm " .. conf_path_install)
+    os.execute("rm " .. bin_path)
 end
 
 
@@ -568,3 +569,4 @@ else
     print_usage()
     os.exit(22)
 end
+os.exit(0)
