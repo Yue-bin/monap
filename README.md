@@ -96,6 +96,9 @@ PublicKey:01234567890123456789012345678901234567890123
 DEMO：
 
 ```shell
+╰─± git clone https://github.com/Yue-bin/monap
+	...
+
 ╰─± ./monap.lua install
 [INFO] config file found: ./etc/monap/config.lua
 [INFO] installing monap to /usr/bin/monap
