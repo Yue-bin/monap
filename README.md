@@ -96,20 +96,31 @@ PublicKey:01234567890123456789012345678901234567890123
 DEMO：
 
 ```shell
-╰─± ./monap.lua info -p 12345
+╰─± ./monap.lua install
 [INFO] config file found: ./etc/monap/config.lua
+[INFO] installing monap to /usr/bin/monap
+[INFO] installing ./etc/monap/config.lua to /etc/monap/config.lua
+
+╰─± monap.lua uninstall
+[INFO] config file found: /etc/monap/config.lua
+[INFO] removing monap from /usr/bin/monap
+Do you want to remove the config file? [y/N]: y
+[INFO] removing config.lua from /etc/monap/config.lua
+
+╰─± monap info -p 12345
+[INFO] config file found: /etc/monap/config.lua
 Peerinfos:
         ASN:4211110001
         IP:172.16.254.254
         Endpoint:example.com:12345
         PublicKey:01234567890123456789012345678901234567890123
 
-╰─± ./monap.lua peer moncak -p 12345 -i "Peerinfos:
+╰─± monap peer moncak -p 12345 -i "Peerinfos:
         ASN:4211110001
         IP:172.16.254.254
         Endpoint:example.com:35018 
         PublicKey:0123456789123456789012345678901234567890123"
-[INFO] config file found: ./etc/monap/config.lua
+[INFO] config file found: /etc/monap/config.lua
 [WARN] PublicKey length is not 44 , but 43
 [INFO] peer with moncak with info
 [INFO] ASN: 4211110001

@@ -451,16 +451,18 @@ end
 -- 安装monap
 local function do_install()
     -- 解析prefix
-    local prefix = find_option_with_value(arg, "-p") or find_option_with_value(arg, "--prefix") or "/"
+    local prefix = find_option_with_value(arg, "--prefix") or "/"
     -- 安装bin
-    run_shell("mkdir -p " .. prefix .. "bin")
-    log("installing " .. name .. " to " .. prefix .. "bin/" .. name, Loglevels.INFO)
-    run_shell("cp " .. arg[0] .. " " .. prefix .. "bin/" .. name)
-    run_shell("chmod +x " .. prefix .. "bin/" .. name)
+    local bin_path = prefix .. "usr/bin/" .. name
+    run_shell("mkdir -p " .. prefix .. "usr/bin")
+    log("installing " .. name .. " to " .. bin_path, Loglevels.INFO)
+    run_shell("cp " .. arg[0] .. " " .. bin_path)
+    run_shell("chmod +x " .. bin_path)
     -- 安装conf
+    local conf_path = prefix .. conf_path .. ConfFile_name
     run_shell("mkdir -p " .. prefix .. conf_path)
-    log("installing " .. ConfFile .. " to " .. prefix .. conf_path .. ConfFile_name, Loglevels.INFO)
-    run_shell("cp " .. ConfFile .. " " .. prefix .. conf_path .. ConfFile_name)
+    log("installing " .. ConfFile .. " to " .. conf_path, Loglevels.INFO)
+    run_shell("cp " .. ConfFile .. " " .. conf_path)
 end
 
 -- 卸载monap
@@ -468,17 +470,18 @@ local function do_uninstall()
     -- 解析prefix
     local prefix = find_option_with_value(arg, "--prefix") or "/"
     -- 卸载bin
-    log("removing " .. name .. " from " .. prefix .. "bin/" .. name, Loglevels.INFO)
-    run_shell("rm " .. prefix .. "bin/" .. name)
+    local bin_path = prefix .. "usr/bin/" .. name
+    log("removing " .. name .. " from " .. bin_path, Loglevels.INFO)
+    run_shell("rm " .. bin_path)
     -- 卸载conf
     io.stdout:write("Do you want to remove the config file? [y/N]: ")
     local answer = io.stdin:read()
     if answer ~= "y" then
         os.exit(0)
     end
-    log("removing " .. prefix .. conf_path .. ConfFile_name .. " from " .. prefix .. conf_path .. ConfFile_name,
-        Loglevels.INFO)
-    run_shell("rm " .. prefix .. conf_path .. ConfFile_name)
+    local conf_path = prefix .. conf_path .. ConfFile_name
+    log("removing " .. ConfFile_name .. " from " .. conf_path, Loglevels.INFO)
+    run_shell("rm " .. conf_path)
 end
 
 
