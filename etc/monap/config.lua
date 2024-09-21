@@ -24,7 +24,7 @@ ConfPaths = {
 }
 
 --just for test
----[[
+--[[
 os.execute("mkdir -p ./testconf/wireguard")
 --ConfPaths.WGconf_str = "./testconf/wireguard/%s.conf"
 ConfPaths.Birdconf = "./testconf/bird.conf"
@@ -40,7 +40,7 @@ ConfPaths.WQOconf = "./testconf/wg-quick-op.yaml"
     ERROR
     FATAL
 --]]
-LOG_LEVEL = Loglevels.DEBUG
+LOG_LEVEL = Loglevels.INFO
 
 -- port genarating method
 -- +: add 1 to the max inuse port
@@ -50,6 +50,7 @@ PortGenMethod = "+"
 -- use old wg-quick-op conf
 -- dont use it with new version wg-quick-op with conf wg-quick-op.toml
 -- OldWGOconf = true
+OldWGOconf = false
 
 -- config templates
 -- wg conf template
@@ -77,7 +78,7 @@ end
 
 -- bird conf template
 function GenBirdConf(name, peerinfo)
-    conf = [[
+    local conf = [[
 protocol bgp ]] .. name .. [[ from BGP_peers {
     neighbor ]] .. peerinfo.IP .. [[%]] .. name .. [[ as ]] .. peerinfo.ASN .. [[;
 }]]

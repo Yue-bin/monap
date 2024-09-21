@@ -54,8 +54,8 @@ Loglevels = {
 local loglevelmax = 4
 local loglevelmin = 0
 -- 默认日志级别
--- LOG_LEVEL = Loglevels.INFO
-LOG_LEVEL = Loglevels.DEBUG
+LOG_LEVEL = Loglevels.INFO
+-- LOG_LEVEL = Loglevels.DEBUG
 
 -- 输出日志到控制台
 local function log(msg, level)
@@ -332,7 +332,7 @@ local function do_peer()
     io.stdout:write("if the peer info is correct, press any key to continue, or press Ctrl+C to exit\n")
     local _ = io.stdin:read()
     -- 生成wg配置文件
-    if not find_option(argstr, "--no-wg") then
+    if not find_option(ArgString, "--no-wg") then
         log("generating wireguard config file", Loglevels.INFO)
         local conf_file = string.format(ConfPaths.WGconf_str, arg[2])
         local port = get_port_available(gen_port_using())
@@ -351,7 +351,7 @@ local function do_peer()
         run_shell("wg-quick-op up " .. arg[2])
     end
     -- 修改wg-quick-op配置文件
-    if find_option(argstr, "--old-wg-quick-op") or not OldWGOconf then
+    if find_option(ArgString, "--old-wg-quick-op") or not OldWGOconf then
         log("modifying wg-quick-op config file", Loglevels.INFO)
         local conf_file = ConfPaths.WQOconf
         if test_file(conf_file) then
@@ -387,7 +387,7 @@ local function do_peer()
         run_shell("service wg-quick-op restart")
     end
     -- 修改bird配置文件
-    if not find_option(argstr, "--no-bird") then
+    if not find_option(ArgString, "--no-bird") then
         log("modifying bird config file", Loglevels.INFO)
         local conf_file = ConfPaths.Birdconf
         if test_file(conf_file) then
@@ -494,25 +494,25 @@ end
 --arg = { ... }
 
 -- 把参数拼接成字符串方便查找全局参数
-argstr = ""
+ArgString = ""
 for i = 1, #arg do
-    argstr = argstr .. arg[i]
+    ArgString = ArgString .. arg[i]
 end
 
 -- 处理-h选项
-if find_option(argstr, "-h") or find_option(argstr, "--help") then
+if find_option(ArgString, "-h") or find_option(ArgString, "--help") then
     print_usage()
     os.exit(0)
 end
 
 -- 再处理-v选项
-if find_option(argstr, "-v") or find_option(argstr, "--version") then
+if find_option(ArgString, "-v") or find_option(ArgString, "--version") then
     print_version()
     os.exit(0)
 end
 
 -- 处理-q选项
-if find_option(argstr, "-q") or find_option(argstr, "--quiet") then
+if find_option(ArgString, "-q") or find_option(ArgString, "--quiet") then
     NULL = io.open("/dev/null", "w")
     io.stdout = NULL
     io.stderr = NULL
