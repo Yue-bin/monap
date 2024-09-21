@@ -430,7 +430,7 @@ end
 
 -- 测试连接
 local function do_test()
-    print("test")
+    log("this function has not been implemented yet", Loglevels.ERROR)
 end
 
 -- 显示连接状态

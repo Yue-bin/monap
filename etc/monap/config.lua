@@ -3,10 +3,8 @@
 --	Athor: Moncak
 --]]
 
-
 --peerinfos
 --Notice: all IP here are the tunnel IP
-
 --your PeerInfo, dont forget remove it when copy this script to others
 YourPeerInfo = {
     ASN = "4211110001",
