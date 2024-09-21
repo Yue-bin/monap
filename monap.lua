@@ -459,10 +459,10 @@ local function do_install()
     run_shell("cp " .. arg[0] .. " " .. bin_path)
     run_shell("chmod +x " .. bin_path)
     -- 安装conf
-    local conf_path = prefix .. conf_path .. ConfFile_name
+    local conf_path_install = prefix .. conf_path .. ConfFile_name
     run_shell("mkdir -p " .. prefix .. conf_path)
-    log("installing " .. ConfFile .. " to " .. conf_path, Loglevels.INFO)
-    run_shell("cp " .. ConfFile .. " " .. conf_path)
+    log("installing " .. ConfFile .. " to " .. conf_path_install, Loglevels.INFO)
+    run_shell("cp " .. ConfFile .. " " .. conf_path_install)
 end
 
 -- 卸载monap
@@ -479,9 +479,9 @@ local function do_uninstall()
     if answer ~= "y" then
         os.exit(0)
     end
-    local conf_path = prefix .. conf_path .. ConfFile_name
-    log("removing " .. ConfFile_name .. " from " .. conf_path, Loglevels.INFO)
-    run_shell("rm " .. conf_path)
+    local conf_path_install = prefix .. conf_path .. ConfFile_name
+    log("removing " .. ConfFile_name .. " from " .. conf_path_install, Loglevels.INFO)
+    run_shell("rm " .. conf_path_install)
 end
 
 
