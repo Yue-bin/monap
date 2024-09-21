@@ -351,7 +351,7 @@ local function do_peer()
         run_shell("wg-quick-op up " .. arg[2])
     end
     -- 修改wg-quick-op配置文件
-    if find_option(ArgString, "--old-wg-quick-op") or not OldWGOconf then
+    if find_option(ArgString, "--old-wg-quick-op") or OldWGOconf then
         log("modifying wg-quick-op config file", Loglevels.INFO)
         local conf_file = ConfPaths.WQOconf
         if test_file(conf_file) then

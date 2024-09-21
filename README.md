@@ -120,13 +120,9 @@ if the peer info is correct, press any key to continue, or press Ctrl+C to exit
 
 [INFO] generating wireguard config file
 [INFO] up the wireguard interface
-[INFO] modifying wg-quick-op config file
-[INFO] restarting wg-quick-op
 [INFO] modifying bird config file
 [INFO] reconfiguring bird
 ```
-
-
 
 ## 依赖
 
