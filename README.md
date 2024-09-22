@@ -69,11 +69,14 @@ Usage: monap [COMMAND] [NAME] [OPTIONS]
         -q, --quiet: quiet mode
         -c, --config <config-file>: specify the config file
         -i, --info <info-str>: the info string genarated by info command
-        -s, --suffix <suffix>: specify the suffix of the backup file (default: bak)
+        --suffix <suffix>: specify the suffix of the backup file (default: bak)
         --prefix <prefix>: specify the prefix of the install path (default: /)
         --log-level <level>: specify the log level
             Loglevels: DEBUG INFO WARN ERROR FATAL
         -p, --port <port>: specify the port
+        --fwmark <fwmark>: specify the fwmark (default: none)
+        --mtu <mtu>: specify the mtu (default: 1388)
+        --keepalive <keepalive>: specify the keepalive (default: none)
         --no-bird: do not operate bird and config file of bird
         --no-wg: do not operate wireguard and config file of wireguard
         --old-wg-quick-op: use the config file wg-quick-op.yaml
