@@ -33,10 +33,12 @@ Usage: ]] .. name .. [[ [COMMAND] [NAME] [OPTIONS]
         --log-level <level>: specify the log level
             Loglevels: DEBUG INFO WARN ERROR FATAL
         -p, --port <port>: specify the port
+        --fwmark <fwmark>: specify the fwmark (default: none)
+        --mtu <mtu>: specify the mtu (default: 1388)
+        --keepalive <keepalive>: specify the keepalive (default: none)
         --no-bird: do not operate bird and config file of bird
         --no-wg: do not operate wireguard and config file of wireguard
         --old-wg-quick-op: use the config file wg-quick-op.yaml
-        --fwmark <fwmark>: specify the fwmark (default: none)
 ]]
 
 -- 搬了一点monlog,因为希望在单文件的情况下尽量减少依赖
@@ -361,18 +363,31 @@ local function do_peer()
         log("invalid info string", Loglevels.ERROR)
         os.exit(5)
     end
+    local port = get_port_available(gen_port_using())
+    local fwmark = find_option_with_value(arg, "--fwmark")
+    local mtu = find_option_with_value(arg, "--mtu")
+    local keepalive = find_option_with_value(arg, "--keepalive")
     log("peer with " .. arg[2] .. " with info", Loglevels.INFO)
     log("ASN: " .. peerinfo.ASN, Loglevels.INFO)
     log("IP: " .. peerinfo.IP, Loglevels.INFO)
     log("Endpoint: " .. peerinfo.Endpoint, Loglevels.INFO)
     log("PublicKey: " .. peerinfo.PublicKey, Loglevels.INFO)
+    log("ListenPort: " .. port, Loglevels.INFO)
+    if fwmark then
+        log("Fwmark: " .. fwmark, Loglevels.INFO)
+    end
+    if mtu then
+        log("MTU: " .. mtu, Loglevels.INFO)
+    end
+    if keepalive then
+        log("Keepalive: " .. keepalive, Loglevels.INFO)
+    end
     io.stdout:write("if the peer info is correct, press any key to continue, or press Ctrl+C to exit\n")
     local _ = io.stdin:read()
     -- 生成wg配置文件
     if not find_option(ArgString, "--no-wg") then
         log("generating wireguard config file", Loglevels.INFO)
         local conf_file = string.format(ConfPaths.WGconf_str, arg[2])
-        local port = get_port_available(gen_port_using())
         if test_file(conf_file) then
             backup(conf_file)
         end
@@ -380,7 +395,7 @@ local function do_peer()
         if not conf then
             log("failed to open " .. conf_file, Loglevels.ERROR)
         else
-            conf:write(gen_wg_conf(peerinfo, port))
+            conf:write(gen_wg_conf(peerinfo, port, fwmark, mtu, keepalive))
             conf:close()
         end
         -- up这个接口
