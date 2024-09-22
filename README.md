@@ -17,34 +17,27 @@ autopeer by moncak
 ## 功能
 
 * 根据配置文件里的信息生成发送给别人的peerinfo
+* 根据输入的peerinfo自动生成和修改相关的配置文件并执行 `wg-quick-op up <name>`和 `birdc configure`
 
-* 根据输入的peerinfo自动生成和修改相关的配置文件并执行`wg-quick-op up <name>`和`birdc configure`
-
+  * 并添加接口到指定的防火墙区域或者 `dn11`或 `vpn`区域
   * 以及对输入的peerinfo进行一些基本的检查
   * TODO: 更加智能的peerinfo识别，JSON格式peerinfo输入输出
-
-* (部分)支持旧版使用`wg-quick-op.yaml`配置文件的`wg-quick-op`
+* (部分)支持旧版使用 `wg-quick-op.yaml`配置文件的 `wg-quick-op`
 
   *新版可以直接忽略了所以就直接抄了旧版的代码也懒得维护*
-
 * 显示某个连接的相关信息
 
-  *其实就是打印`wg show <name>`和`birdc show protocol <name>`但是可以一起watch诶不香吗）*
-
+  *其实就是打印 `wg show <name>`和 `birdc show protocol <name>`但是可以一起watch诶不香吗）*
 * 显示所有已经被使用的端口
 
-  *貌似`wg-quick-op`支持来着但是我忘记是什么了就）*
+  *貌似 `wg-quick-op`支持来着但是我忘记是什么了就）*
+* 按照配置文件给定的 `PortGenMethod`和正在使用中的端口自动选择新使用的端口
 
-* 按照配置文件给定的`PortGenMethod`和正在使用中的端口自动选择新使用的端口
-
-  也可手动使用`-p`或`--port`指定
+  也可手动使用 `-p`或 `--port`指定
 
   **当不存在正在使用的端口的时候必须手动指定**
-
 * 提供还原备份功能
-
-* 安装与卸载，可以指定可选的`--prefix`参数
-
+* 安装与卸载，可以指定可选的 `--prefix`参数
 * TODO: 检查连接，自动化排障
 
 ## 用法
@@ -81,7 +74,9 @@ Usage: monap [COMMAND] [NAME] [OPTIONS]
         --no-wg: do not operate wireguard and config file of wireguard
         --old-wg-quick-op: use the config file wg-quick-op.yaml
 ```
+
 其中peerinfo的示例如下：
+
 ```
 Peerinfos:
         ASN:4211110001
@@ -89,7 +84,9 @@ Peerinfos:
         Endpoint:example.com:12345
         PublicKey:01234567890123456789012345678901234567890123
 ```
+
 但是事实上只需要包含以下的必须字段：
+
 ```
 ASN:4211110001
 IP:172.16.254.254
@@ -147,12 +144,22 @@ if the peer info is correct, press any key to continue, or press Ctrl+C to exit
 
 代码主体完全基于Lua的官方库
 
-相关操作需要有`bird2`,`birdc2`,`wg-quick-op`支持
+相关操作需要有 `bird2`,`birdc2`,`wg-quick-op`支持
+
+防火墙操作需要有 `uci`支持
+
+总体来说现在基本是非 `OpenWrt`不行了
 
 *`OpenWrt`自带lua5.1用于提供luci所以完美支持的说*
 
 ## 杂项
 
-非`OpenWrt`用户使用记得妥善管理`<prefix>/etc/monap/config.lua`的写权限，因为我没有做防鸿儒处理所以可以直接在`config.lua`中注入lua语句
+非单用户系统使用记得妥善管理 `<prefix>/etc/monap/config.lua`的写权限，因为我没有做防鸿儒处理所以可以直接在 `config.lua`中注入lua语句
 
-*反正OP就一个root谁管他(x*
+*反正OP默认就一个root谁管他(x*
+
+## 感谢
+
+本项目参考了以下项目：
+
+[luci-network-dn11]:(https://github.com/dn-11/luci-network-dn11 "luci-network-dn11")

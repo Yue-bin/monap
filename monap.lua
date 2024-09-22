@@ -6,11 +6,11 @@
 
 -- 版本号及名称
 local version = "0.1.1"
-local name = "monap"
+local script_name = "monap"
 
 local usage = [[
 monap is a script for autopeer
-Usage: ]] .. name .. [[ [COMMAND] [NAME] [OPTIONS]
+Usage: ]] .. script_name .. [[ [COMMAND] [NAME] [OPTIONS]
     Commands:
         info: genarate the peerinfo
         peer: peer with others
@@ -36,6 +36,9 @@ Usage: ]] .. name .. [[ [COMMAND] [NAME] [OPTIONS]
         --fwmark <fwmark>: specify the fwmark (default: none)
         --mtu <mtu>: specify the mtu (default: 1388)
         --keepalive <keepalive>: specify the keepalive (default: none)
+        --fw <firewall>: specify the firewall zone name (default: dn11/vpn)
+        --no-fw: do not operate firewall
+            will not affect the fwmark option
         --no-bird: do not operate bird and config file of bird
         --no-wg: do not operate wireguard and config file of wireguard
         --old-wg-quick-op: use the config file wg-quick-op.yaml
@@ -71,6 +74,7 @@ local flag_reg = {
     ["--help"] = "help",
     ["-q"] = "quiet",
     ["--quiet"] = "quiet",
+    ["--no-fw"] = "no-fw",
     ["--no-bird"] = "no-bird",
     ["--no-wg"] = "no-wg",
     ["--old-wg-quick-op"] = "old-wg-quick-op"
@@ -89,7 +93,8 @@ local arg_reg = {
     ["--port"] = "port",
     ["--fwmark"] = "fwmark",
     ["--mtu"] = "mtu",
-    ["--keepalive"] = "keepalive"
+    ["--keepalive"] = "keepalive",
+    ["--fw"] = "firewall"
 }
 
 -- 检查在哪个注册表中
@@ -186,7 +191,7 @@ end
 
 -- 输出版本信息
 local function print_version()
-    io.stderr:write(name .. " " .. version)
+    io.stderr:write(script_name .. " " .. version)
 end
 
 -- 测试文件是否存在
@@ -496,6 +501,36 @@ local function do_peer()
         log("up the wireguard interface", Loglevels.INFO)
         run_shell("wg-quick-op up " .. arg[2])
     end
+    -- 修改防火墙
+    if not find_option("no-fw") then
+        log("operating firewall", Loglevels.INFO)
+        local fw_zone_name = find_option_with_value("firewall")
+        -- mainly from https://github.com/dn-11/luci-network-dn11
+        local uci = require("luci.model.uci").cursor()
+        local zones = uci:get_all("firewall")
+        local vpn_zone
+        for name, zone in pairs(zones) do
+            log("checking firewall zone " .. name, Loglevels.DEBUG)
+            if zone.name == fw_zone_name then
+                vpn_zone = name
+                break
+            elseif zone.name == 'dn11' then
+                vpn_zone = name
+                break
+            elseif zone.name == 'vpn' then
+                vpn_zone = name
+                break
+            end
+        end
+        if vpn_zone then
+            log("adding interface " .. arg[2] .. " to firewall zone" .. vpn_zone, Loglevels.INFO)
+            local device_list = uci:get("firewall", vpn_zone, "device") or {}
+            table.insert(device_list, arg[2])
+            uci:set_list("firewall", vpn_zone, "device", device_list)
+            uci:commit("firewall")
+            run_shell("/etc/init.d/firewall reload")
+        end
+    end
     -- 修改wg-quick-op配置文件
     if find_option("old-wg-quick-op") or OldWGOconf then
         log("modifying wg-quick-op config file", Loglevels.INFO)
@@ -554,7 +589,6 @@ local function do_peer()
         log("reconfiguring bird", Loglevels.INFO)
         run_shell("birdc configure")
     end
-    -- TODO:修改防火墙把接口添加到dn11区域
 end
 
 -- 恢复配置文件
@@ -599,9 +633,9 @@ local function do_install()
     -- 解析prefix
     local prefix = find_option_with_value("prefix") or "/"
     -- 安装bin
-    local bin_path = prefix .. "usr/bin/" .. name
+    local bin_path = prefix .. "usr/bin/" .. script_name
     run_shell("mkdir -p " .. prefix .. "usr/bin")
-    log("installing " .. name .. " to " .. bin_path, Loglevels.INFO)
+    log("installing " .. script_name .. " to " .. bin_path, Loglevels.INFO)
     run_shell("cp " .. arg[0] .. " " .. bin_path)
     run_shell("chmod +x " .. bin_path)
     -- 安装conf
@@ -627,8 +661,8 @@ local function do_uninstall()
     -- 我草你的Op的busybox不能自己删自己
     --run_shell("rm " .. bin_path)
     -- 卸载bin
-    local bin_path = prefix .. "usr/bin/" .. name
-    log("removing " .. name .. " from " .. bin_path, Loglevels.INFO)
+    local bin_path = prefix .. "usr/bin/" .. script_name
+    log("removing " .. script_name .. " from " .. bin_path, Loglevels.INFO)
     os.execute("rm " .. bin_path)
 end
 
