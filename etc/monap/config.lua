@@ -53,34 +53,49 @@ PortGenMethod = "+"
 OldWGOconf = false
 
 -- config templates
--- wg conf template
--- 干李良的lua的语法糖忽略[[后第一个换行符我还得手动加上去
-function GenWGConf(peerinfo, port)
-    local conf = [[
-[Interface]
-PrivateKey = ]] .. YourPeerInfo.PrivateKey .. [[\n
-ListenPort = ]] .. port .. [[\n
-PostUp = /sbin/ip addr add dev %i ]] .. YourPeerInfo.IP .. [[/32 peer ]] .. peerinfo.IP .. [[/32
-Table = off
-MTU = 1388
+-- 对于每一个<foo>,如果对应的foo存在于替换列表中,都会被替换为foo对应的值
+-- 每一个模版都会提供一个替换列表
+-- 前面带有#的行是可选项，如果在使用中没有明确指定或者为空的话，会被忽略
+-- 即以注释的形式写入文件
 
-]] .. "[Peer]"
-    --if Endpoint is not empty, add it
-    if peerinfo.Endpoint ~= "" then
-        conf = conf .. "Endpoint = " .. peerinfo.Endpoint
-    end
-    conf = conf .. [[\n
-PublicKey = ]] .. peerinfo.PublicKey .. [[\n
+-- wg conf template
+--[[
+    替换列表:
+        <pri_key> : 你的私钥
+        <port> : 你的端口
+        <local_ip> : 你的本地隧道IP
+        <peer_ip> : 你的对端隧道IP
+        <mtu> : 接口的MTU
+        <fwmark> : 防火墙标记
+        <endpoint> : 对端的地址
+        <pub_key> : 你的公钥
+        <keepalive> : 保持活跃时间
+]]
+WGConfT = [[
+[Interface]
+PrivateKey = <pri_key>
+ListenPort = <port>
+PostUp = /sbin/ip addr add dev %i <local_ip>/32 peer <peer_ip>/32
+# PostUp = wg set %i fwmark <fwmark>
+Table = off
+MTU = <mtu>
+
+[Peer]
+# Endpoint = <endpoint>
+PublicKey = <pub_key>
 AllowedIPs = 10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16
-    ]]
-    return conf
-end
+# PersistentKeepalive = <keepalive>
+]]
 
 -- bird conf template
-function GenBirdConf(name, peerinfo)
-    local conf = [[
-protocol bgp ]] .. name .. [[ from BGP_peers {
-    neighbor ]] .. peerinfo.IP .. [[%]] .. name .. [[ as ]] .. peerinfo.ASN .. [[;
-}]]
-    return conf
-end
+--[[
+    替换列表:
+        <name> : 你的隧道名称以及bird的实例名称
+        <peer_ip> : 对端的隧道IP
+        <asn> : 对端的ASN
+]]
+BirdConfT = [[
+protocol bgp <name> from BGP_peers {
+    neighbor <peer_ip>%<name> as <asn>;
+}
+]]

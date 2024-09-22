@@ -36,6 +36,7 @@ Usage: ]] .. name .. [[ [COMMAND] [NAME] [OPTIONS]
         --no-bird: do not operate bird and config file of bird
         --no-wg: do not operate wireguard and config file of wireguard
         --old-wg-quick-op: use the config file wg-quick-op.yaml
+        --fwmark <fwmark>: specify the fwmark (default: none)
 ]]
 
 -- 搬了一点monlog,因为希望在单文件的情况下尽量减少依赖
@@ -296,6 +297,42 @@ local function get_port_available(portlist)
     return port
 end
 
+-- 生成wireguard配置文件
+local function gen_wg_conf(peerinfo, port, fwmark, mtu, keepalive)
+    -- 从模板进行那个超级大替换啊
+    -- 先处理必选项
+    local conf = string.gsub(WGConfT, "<pri_key>", YourPeerInfo.PrivateKey)
+    conf = string.gsub(conf, "<port>", port)
+    conf = string.gsub(conf, "<local_ip>", YourPeerInfo.IP)
+    conf = string.gsub(conf, "<peer_ip>", peerinfo.IP)
+    conf = string.gsub(conf, "<mtu>", mtu or "1388")
+    conf = string.gsub(conf, "<pub_key>", peerinfo.PublicKey)
+    -- 然后处理可选项,替换并取消注释
+    if fwmark then
+        -- 我草了copylot这个匹配替换的思路简直是天才
+        -- 就是他可能不太知道我匹配的具体情况还得改
+        conf = string.gsub(conf, "#%s*([^\n\r]-fwmark.-[\n\r])", "%1")
+        conf = string.gsub(conf, "<fwmark>", fwmark)
+    end
+    if peerinfo.Endpoint ~= "" then
+        conf = string.gsub(conf, "#%s*([^\n\r]-endpoint.-[\n\r])", "%1")
+        conf = string.gsub(conf, "<endpoint>", peerinfo.Endpoint)
+    end
+    if keepalive then
+        conf = string.gsub(conf, "#%s*([^\n\r]-keepalive.-[\n\r])", "%1")
+        conf = string.gsub(conf, "<keepalive>", keepalive)
+    end
+    return conf
+end
+
+-- 生成bird配置文件
+local function gen_bird_conf(peername, peerinfo)
+    local conf = string.gsub(BirdConfT, "<name>", peername)
+    conf = string.gsub(conf, "<peer_ip>", peerinfo.IP)
+    conf = string.gsub(conf, "<asn>", peerinfo.ASN)
+    return conf
+end
+
 -- 生成peerinfo
 local function do_info()
     if not YourPeerInfo then
@@ -343,7 +380,7 @@ local function do_peer()
         if not conf then
             log("failed to open " .. conf_file, Loglevels.ERROR)
         else
-            conf:write(GenWGConf(peerinfo, port))
+            conf:write(gen_wg_conf(peerinfo, port))
             conf:close()
         end
         -- up这个接口
@@ -397,7 +434,7 @@ local function do_peer()
         if not conf then
             log("failed to open " .. conf_file, Loglevels.ERROR)
         else
-            conf:write(GenBirdConf(arg[2], peerinfo))
+            conf:write(gen_bird_conf(arg[2], peerinfo))
             conf:close()
         end
         -- 测试配置文件
