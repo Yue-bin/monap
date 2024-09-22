@@ -28,7 +28,7 @@ Usage: ]] .. name .. [[ [COMMAND] [NAME] [OPTIONS]
         -q, --quiet: quiet mode
         -c, --config <config-file>: specify the config file
         -i, --info <info-str>: the info string genarated by info command
-        -s, --suffix <suffix>: specify the suffix of the backup file (default: bak)
+        --suffix <suffix>: specify the suffix of the backup file (default: bak)
         --prefix <prefix>: specify the prefix of the install path (default: /)
         --log-level <level>: specify the log level
             Loglevels: DEBUG INFO WARN ERROR FATAL
@@ -40,6 +40,92 @@ Usage: ]] .. name .. [[ [COMMAND] [NAME] [OPTIONS]
         --no-wg: do not operate wireguard and config file of wireguard
         --old-wg-quick-op: use the config file wg-quick-op.yaml
 ]]
+
+-- 把参数拼接成字符串方便查找参数
+ArgString = ""
+for i = 1, #arg do
+    ArgString = ArgString .. arg[i]
+end
+
+-- 命令注册表
+local cmd_reg = {
+    ["info"] = "info",
+    ["restore"] = "restore",
+    ["showport"] = "showport",
+    ["install"] = "install",
+    ["uninstall"] = "uninstall"
+}
+
+-- 带值命令注册表
+local cmd_val_reg = {
+    ["peer"] = "peer",
+    ["test"] = "test",
+    ["show"] = "show"
+}
+
+-- flag参数注册表
+local flag_reg = {
+    ["-v"] = "version",
+    ["--version"] = "version",
+    ["-h"] = "help",
+    ["--help"] = "help",
+    ["-q"] = "quiet",
+    ["--quiet"] = "quiet",
+    ["--no-bird"] = "no-bird",
+    ["--no-wg"] = "no-wg",
+    ["--old-wg-quick-op"] = "old-wg-quick-op"
+}
+
+-- 带值参数注册表
+local arg_reg = {
+    ["-c"] = "config",
+    ["--config"] = "config",
+    ["-i"] = "info",
+    ["--info"] = "info",
+    ["--suffix"] = "suffix",
+    ["--prefix"] = "prefix",
+    ["--log-level"] = "log-level",
+    ["-p"] = "port",
+    ["--port"] = "port",
+    ["--fwmark"] = "fwmark",
+    ["--mtu"] = "mtu",
+    ["--keepalive"] = "keepalive"
+}
+
+-- 检查在哪个注册表中
+local function find_reg(arg_str)
+    if cmd_reg[arg_str] then
+        return "cmd"
+    elseif cmd_val_reg[arg_str] then
+        return "cmd_val"
+    elseif flag_reg[arg_str] then
+        return "flag"
+    elseif arg_reg[arg_str] then
+        return "arg"
+    else
+        return nil
+    end
+end
+
+-- 查找未注册的命令或选项,返回第一个未注册的参数和是否为带值参数的值
+local function check_noreg()
+    local i = 1
+    while i <= #arg do
+        print(i, arg[i])
+        local reg = find_reg(arg[i])
+        if not reg then
+            return arg[i], false
+            -- 如果是带值参数就反向监测下一个参数,并跳过下一个参数
+        elseif reg == "arg" or reg == "cmd_val" then
+            if i + 1 > #arg or find_reg(arg[i + 1]) then
+                return arg[i], true
+            end
+            i = i + 1
+        end
+        i = i + 1
+    end
+    return nil
+end
 
 -- 搬了一点monlog,因为希望在单文件的情况下尽量减少依赖
 Loglevels = {
@@ -181,22 +267,31 @@ local function restore(conf, suffix)
 end
 
 -- 处理参数：只要存在参数就返回true
-local function find_option(arg_str, opt)
-    if string.find(arg_str, opt, 1, true) then
-        return true
-    else
-        return false
+local function find_option(arg_name)
+    -- 先查注册表找到对应的参数名
+    for arg_str, arg_name_reg in pairs(flag_reg) do
+        if arg_name == arg_name_reg then
+            -- 再查实际的参数列表
+            if string.find(ArgString, arg_str, 1, true) then
+                return true
+            end
+        end
     end
+    return false
 end
 
 -- 处理一般参数：参数和值都存在时才返回值，否则返回nil
-local function find_option_with_value(arg_table, opt)
-    for i = 1, #arg_table do
-        if arg_table[i] == opt then
-            if i + 1 <= #arg_table then
-                return arg_table[i + 1]
-            else
-                return nil
+local function find_option_with_value(arg_name)
+    for arg_str, arg_name_reg in pairs(arg_reg) do
+        if arg_name == arg_name_reg then
+            for i = 1, #arg do
+                if arg[i] == arg_str then
+                    if i + 1 <= #arg then
+                        return arg[i + 1]
+                    else
+                        return nil
+                    end
+                end
             end
         end
     end
@@ -279,7 +374,7 @@ end
 
 -- 获取可用端口
 local function get_port_available(portlist)
-    local port = find_option_with_value(arg, "-p") or find_option_with_value(arg, "--port")
+    local port = find_option_with_value("port")
     if not port then
         if not portlist or #portlist < 1 then
             log("no port in use, please specify the port", Loglevels.ERROR)
@@ -353,7 +448,7 @@ end
 -- 与其他peer建立连接
 local function do_peer()
     -- 读取info与预检查
-    local infostr = find_option_with_value(arg, "-i") or find_option_with_value(arg, "--info")
+    local infostr = find_option_with_value("info")
     if not infostr then
         log("please specify the info string by -i or --info option", Loglevels.ERROR)
         os.exit(4)
@@ -364,9 +459,9 @@ local function do_peer()
         os.exit(5)
     end
     local port = get_port_available(gen_port_using())
-    local fwmark = find_option_with_value(arg, "--fwmark")
-    local mtu = find_option_with_value(arg, "--mtu")
-    local keepalive = find_option_with_value(arg, "--keepalive")
+    local fwmark = find_option_with_value("fwmark")
+    local mtu = find_option_with_value("mtu")
+    local keepalive = find_option_with_value("keepalive")
     log("peer with " .. arg[2] .. " with info", Loglevels.INFO)
     log("ASN: " .. peerinfo.ASN, Loglevels.INFO)
     log("IP: " .. peerinfo.IP, Loglevels.INFO)
@@ -385,7 +480,7 @@ local function do_peer()
     io.stdout:write("if the peer info is correct, press any key to continue, or press Ctrl+C to exit\n")
     local _ = io.stdin:read()
     -- 生成wg配置文件
-    if not find_option(ArgString, "--no-wg") then
+    if not find_option("no-wg") then
         log("generating wireguard config file", Loglevels.INFO)
         local conf_file = string.format(ConfPaths.WGconf_str, arg[2])
         if test_file(conf_file) then
@@ -403,7 +498,7 @@ local function do_peer()
         run_shell("wg-quick-op up " .. arg[2])
     end
     -- 修改wg-quick-op配置文件
-    if find_option(ArgString, "--old-wg-quick-op") or OldWGOconf then
+    if find_option("old-wg-quick-op") or OldWGOconf then
         log("modifying wg-quick-op config file", Loglevels.INFO)
         local conf_file = ConfPaths.WQOconf
         if test_file(conf_file) then
@@ -439,7 +534,7 @@ local function do_peer()
         run_shell("service wg-quick-op restart")
     end
     -- 修改bird配置文件
-    if not find_option(ArgString, "--no-bird") then
+    if not find_option("no-bird") then
         log("modifying bird config file", Loglevels.INFO)
         local conf_file = ConfPaths.Birdconf
         if test_file(conf_file) then
@@ -465,7 +560,7 @@ end
 
 -- 恢复配置文件
 local function do_restore()
-    local suffix = find_option_with_value(arg, "-s") or find_option_with_value(arg, "--suffix") or "bak"
+    local suffix = find_option_with_value("suffix") or "bak"
     io.stdout:write("Do you want to restore the bird config file? [y/N]: ")
     local answer = io.stdin:read()
     if answer == "y" then
@@ -503,7 +598,7 @@ end
 -- 安装monap
 local function do_install()
     -- 解析prefix
-    local prefix = find_option_with_value(arg, "--prefix") or "/"
+    local prefix = find_option_with_value("prefix") or "/"
     -- 安装bin
     local bin_path = prefix .. "usr/bin/" .. name
     run_shell("mkdir -p " .. prefix .. "usr/bin")
@@ -520,7 +615,7 @@ end
 -- 卸载monap
 local function do_uninstall()
     -- 解析prefix
-    local prefix = find_option_with_value(arg, "--prefix") or "/"
+    local prefix = find_option_with_value("prefix") or "/"
     io.stdout:write("Do you want to remove the config file? [y/N]: ")
     io.stdout:flush()
     local answer = io.stdin:read()
@@ -550,38 +645,45 @@ end
 -- 我草你的这么搞没有arg[0]和负数索引了
 --arg = { ... }
 
--- 把参数拼接成字符串方便查找全局参数
-ArgString = ""
-for i = 1, #arg do
-    ArgString = ArgString .. arg[i]
-end
-
--- 处理-h选项
-if find_option(ArgString, "-h") or find_option(ArgString, "--help") then
+-- 处理help选项
+if find_option("help") then
     print_usage()
     os.exit(0)
 end
 
--- 再处理-v选项
-if find_option(ArgString, "-v") or find_option(ArgString, "--version") then
+-- 查找不存在于注册表中的命令或选项
+local noreg, with_value = check_noreg()
+if noreg then
+    if with_value then
+        io.stderr:write("missing value for arguement: " .. noreg .. "\n")
+        print_usage()
+        os.exit(22)
+    end
+    io.stderr:write("unknown command or option: " .. noreg .. "\n")
+    print_usage()
+    os.exit(22)
+end
+
+-- 再处理version选项
+if find_option("version") then
     print_version()
     os.exit(0)
 end
 
--- 处理-q选项
-if find_option(ArgString, "-q") or find_option(ArgString, "--quiet") then
+-- 处理quiet选项
+if find_option("quiet") then
     NULL = io.open("/dev/null", "w")
     io.stdout = NULL
     io.stderr = NULL
 end
 
 -- 处理--log-level选项
-LOG_LEVEL = find_option_with_value(arg, "--log-level") or LOG_LEVEL
+LOG_LEVEL = find_option_with_value("log-level") or LOG_LEVEL
 
 -- 加载配置文件
 -- 其实这里会有一个注入点存在，你可以直接往配置文件里狠狠注入
 -- 但是一般情况下配置文件不会被奇奇怪怪的人摸到吧）
-ConfFile = find_option_with_value(arg, "-c") or find_option_with_value(arg, "--config") or search_conf()
+ConfFile = find_option_with_value("config") or search_conf()
 if not test_file(ConfFile) then
     io.stderr:write("config file not found\n")
     os.exit(2)
@@ -617,9 +719,5 @@ elseif arg[1] == "install" then
     do_install()
 elseif arg[1] == "uninstall" then
     do_uninstall()
-else
-    io.stderr:write("unknown command or option: " .. arg[1] .. "\n")
-    print_usage()
-    os.exit(22)
 end
 os.exit(0)
