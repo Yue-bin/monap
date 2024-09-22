@@ -5,7 +5,7 @@
 -- Athor: Moncak
 
 -- 版本号及名称
-local version = "0.1.0"
+local version = "0.1.1"
 local name = "monap"
 
 local usage = [[
