@@ -162,4 +162,4 @@ if the peer info is correct, press any key to continue, or press Ctrl+C to exit
 
 本项目参考了以下项目：
 
-[luci-network-dn11]:(https://github.com/dn-11/luci-network-dn11 "luci-network-dn11")
+[luci-network-dn11](https://github.com/dn-11/luci-network-dn11)
