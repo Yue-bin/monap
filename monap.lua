@@ -111,7 +111,6 @@ end
 local function check_noreg()
     local i = 1
     while i <= #arg do
-        print(i, arg[i])
         local reg = find_reg(arg[i])
         if not reg then
             return arg[i], false
