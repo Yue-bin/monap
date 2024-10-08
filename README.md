@@ -21,7 +21,7 @@ autopeer by moncak
 
   * 并添加接口到指定的防火墙区域或者 `dn11`或 `vpn`区域
   * 以及对输入的peerinfo进行一些基本的检查
-  * TODO: 更加智能的peerinfo识别，JSON格式peerinfo输入输出
+  * 目前支持JSON格式peerinfo输入输出
 * (部分)支持旧版使用 `wg-quick-op.yaml`配置文件的 `wg-quick-op`
 
   *新版可以直接忽略了所以就直接抄了旧版的代码也懒得维护*
@@ -93,6 +93,17 @@ IP:172.16.254.254
 PublicKey:01234567890123456789012345678901234567890123
 ```
 
+JSON格式的peerinfo示例如下：（我开启了pretty选项让他更美观一点，可以在config中关闭）
+
+```json
+{
+  "Endpoint": "monblog.top:12345",
+  "PublicKey": "tG2bVfI1qo\/FpVZDP00FVjGjSc3BbPARFfORCw2klWM=",
+  "ASN": "4211110712",
+  "IP": "172.16.29.254"
+}
+```
+
 DEMO：
 
 ```shell
@@ -140,15 +151,20 @@ if the peer info is correct, press any key to continue, or press Ctrl+C to exit
 
 ## 依赖
 
-~~hundred の hundred percents in lua official(x~~
+~~hundred の hundred percents in lua(x~~
 
 代码主体完全基于Lua的官方库
 
 相关操作需要有 `bird2`,`birdc2`,`wg-quick-op`支持
 
-防火墙操作需要有 `uci`支持
+防火墙操作以及json的序列化和反序列化依赖于`luci`
 
-总体来说现在基本是非 `OpenWrt`不行了
+非 `OpenWrt`环境在排除这几个功能之后可以正常使用
+
+但是：
+
+- 后续准备更多地依赖`luci`~~luci给的真多吧~~
+- 不保证当前及以后版本能在其它环境下正常工作
 
 *`OpenWrt`自带lua5.1用于提供luci所以完美支持的说*
 
