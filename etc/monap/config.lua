@@ -52,6 +52,10 @@ PortGenMethod = "+"
 -- OldWGOconf = true
 OldWGOconf = false
 
+-- to enable(or not) the pretty-json format
+PrettyJson = true
+
+
 -- config templates
 -- 对于每一个<foo>,如果对应的foo存在于替换列表中,都会被替换为foo对应的值
 -- 每一个模版都会提供一个替换列表

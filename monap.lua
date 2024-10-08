@@ -503,7 +503,13 @@ local function do_info()
             log("errmsg: " .. json, Loglevels.DEBUG)
         else
             --io.stdout:write("Peerinfos:\n")
-            io.stdout:write(json.stringify(peerinfo, true) .. "\n")
+            if PrettyJson == nil then
+                io.stdout:write(json.stringify(peerinfo, true) .. "\n")
+            else
+                local PrettyJson = PrettyJson or false
+                log("PrettyJson is enabled: " .. tostring(PrettyJson), Loglevels.DEBUG)
+                io.stdout:write(json.stringify(peerinfo, PrettyJson) .. "\n")
+            end
         end
     else
         io.stdout:write("Peerinfos:\n")
@@ -798,6 +804,10 @@ if not test_file(ConfFile) then
     os.exit(2)
 end
 dofile(ConfFile)
+
+-- 因为手动指定的log-level应凌驾于配置文件中的log-level之上，所以再处理一次
+-- 处理--log-level选项
+LOG_LEVEL = Loglevels[find_option_with_value("log-level")] or LOG_LEVEL
 
 -- 处理出现在config中的flag
 OldWGOconf = find_option("old-wg-quick-op") or OldWGOconf
