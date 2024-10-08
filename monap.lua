@@ -4,6 +4,8 @@
 -- Description: a script for autopeer
 -- Athor: Moncak
 
+
+--#region helper functions 和一些全局变量初始化
 -- 版本号及名称
 local version = "0.1.1"
 local script_name = "monap"
@@ -44,6 +46,97 @@ Usage: ]] .. script_name .. [[ [COMMAND] [NAME] [OPTIONS]
         --old-wg-quick-op: use the config file wg-quick-op.yaml
 ]]
 
+-- 输出帮助信息
+local function print_usage()
+    -- 参照ssh的usage输出使用了stderr)
+    io.stderr:write(usage)
+end
+
+-- 输出版本信息
+local function print_version()
+    io.stderr:write(script_name .. " " .. version)
+end
+
+
+-- 日志相关初始化
+-- 搬了一点monlog,因为希望在单文件的情况下尽量减少依赖
+Loglevels = {
+    [0] = "DEBUG",
+    [1] = "INFO",
+    [2] = "WARN",
+    [3] = "ERROR",
+    [4] = "FATAL",
+    DEBUG = 0,
+    INFO = 1,
+    WARN = 2,
+    ERROR = 3,
+    FATAL = 4
+}
+local loglevelmax = 4
+local loglevelmin = 0
+-- 默认日志级别
+LOG_LEVEL = Loglevels.INFO
+-- LOG_LEVEL = Loglevels.DEBUG
+
+-- 输出日志到控制台
+local function log(msg, level)
+    if level ~= nil then
+        assert((level >= loglevelmin and level <= loglevelmax), "level is invalid")
+        if level < LOG_LEVEL then
+            return false
+        end
+    end
+    if level ~= nil then
+        -- INFO及以上用stdout,其他用stderr
+        if level <= Loglevels.INFO then
+            io.stdout:write("[" .. Loglevels[level] .. "]")
+        else
+            io.stderr:write("[" .. Loglevels[level] .. "]")
+        end
+    else
+        -- 默认INFO
+        io.stdout:write("[INFO]")
+    end
+    io.stdout:write(" " .. msg .. "\n")
+    return true
+end
+
+
+-- 配置文件相关初始化
+-- 配置文件路径,monap会在seach_path..conf_path中搜索配置文件
+local conf_path = "etc/monap/"
+local seach_path = {
+    "/",
+    "/usr/",
+    "/usr/local/",
+    "./"
+}
+local ConfFile_name = "config.lua"
+
+
+-- 较为基本的功能性的helper函数
+-- 测试文件是否存在
+local function test_file(file)
+    local f = io.open(file, "r")
+    if f ~= nil then
+        f:close()
+        return true
+    else
+        return false
+    end
+end
+
+-- 运行shell并返回结果
+local function run_shell(cmd)
+    log("running shell: " .. cmd, Loglevels.DEBUG)
+    local f = assert(io.popen(cmd, "r"))
+    local s = assert(f:read("*a"))
+    f:close()
+    return s
+end
+
+
+-- 参数处理相关初始化
 -- 把参数拼接成字符串方便查找参数
 ArgString = ""
 for i = 1, #arg do
@@ -131,88 +224,41 @@ local function check_noreg()
     return nil
 end
 
--- 搬了一点monlog,因为希望在单文件的情况下尽量减少依赖
-Loglevels = {
-    [0] = "DEBUG",
-    [1] = "INFO",
-    [2] = "WARN",
-    [3] = "ERROR",
-    [4] = "FATAL",
-    DEBUG = 0,
-    INFO = 1,
-    WARN = 2,
-    ERROR = 3,
-    FATAL = 4
-}
-local loglevelmax = 4
-local loglevelmin = 0
--- 默认日志级别
-LOG_LEVEL = Loglevels.INFO
--- LOG_LEVEL = Loglevels.DEBUG
-
--- 输出日志到控制台
-local function log(msg, level)
-    if level ~= nil then
-        assert((level >= loglevelmin and level <= loglevelmax), "level is invalid")
-        if level < LOG_LEVEL then
-            return false
+-- 处理参数：只要存在参数就返回true
+local function find_option(arg_name)
+    -- 先查注册表找到对应的参数名
+    for arg_str, arg_name_reg in pairs(flag_reg) do
+        if arg_name == arg_name_reg then
+            -- 再查实际的参数列表
+            if string.find(ArgString, arg_str, 1, true) then
+                return true
+            end
         end
     end
-    if level ~= nil then
-        -- INFO及以上用stdout,其他用stderr
-        if level <= Loglevels.INFO then
-            io.stdout:write("[" .. Loglevels[level] .. "]")
-        else
-            io.stderr:write("[" .. Loglevels[level] .. "]")
+    return false
+end
+
+-- 处理一般参数：参数和值都存在时才返回值，否则返回nil
+local function find_option_with_value(arg_name)
+    local matched_arg_str = nil
+    for arg_str, arg_name_reg in pairs(arg_reg) do
+        if arg_name == arg_name_reg then
+            matched_arg_str = arg_str
+            break
         end
-    else
-        -- 默认INFO
-        io.stdout:write("[INFO]")
     end
-    io.stdout:write(" " .. msg .. "\n")
-    return true
-end
-
--- 配置文件路径,monap会在seach_path..conf_path中搜索配置文件
-local conf_path = "etc/monap/"
-local seach_path = {
-    "/",
-    "/usr/",
-    "/usr/local/",
-    "./"
-}
-local ConfFile_name = "config.lua"
-
--- 输出帮助信息
-local function print_usage()
-    -- 参照ssh的usage输出使用了stderr)
-    io.stderr:write(usage)
-end
-
--- 输出版本信息
-local function print_version()
-    io.stderr:write(script_name .. " " .. version)
-end
-
--- 测试文件是否存在
-local function test_file(file)
-    local f = io.open(file, "r")
-    if f ~= nil then
-        f:close()
-        return true
-    else
-        return false
+    for i = 1, #arg do
+        if arg[i] == matched_arg_str then
+            if i + 1 <= #arg then
+                return arg[i + 1]
+            else
+                return nil
+            end
+        end
     end
+    return nil
 end
 
--- 运行shell并返回结果
-local function run_shell(cmd)
-    log("running shell: " .. cmd, Loglevels.DEBUG)
-    local f = assert(io.popen(cmd, "r"))
-    local s = assert(f:read("*a"))
-    f:close()
-    return s
-end
 
 -- 搜索配置文件
 local function search_conf()
@@ -236,6 +282,8 @@ local function search_conf()
     return path
 end
 
+
+-- 一些不那么基础的功能性的helper函数
 -- 备份配置文件,不指定后缀则默认为bak
 local function backup(conf, suffix)
     if type(suffix) ~= "nil" and type(suffix) ~= "string" then
@@ -268,38 +316,6 @@ local function restore(conf, suffix)
         log("backup file not found", Loglevels.ERROR)
     end
     os.execute(string.format("cp %s.%s %s", conf, suffix, conf))
-end
-
--- 处理参数：只要存在参数就返回true
-local function find_option(arg_name)
-    -- 先查注册表找到对应的参数名
-    for arg_str, arg_name_reg in pairs(flag_reg) do
-        if arg_name == arg_name_reg then
-            -- 再查实际的参数列表
-            if string.find(ArgString, arg_str, 1, true) then
-                return true
-            end
-        end
-    end
-    return false
-end
-
--- 处理一般参数：参数和值都存在时才返回值，否则返回nil
-local function find_option_with_value(arg_name)
-    for arg_str, arg_name_reg in pairs(arg_reg) do
-        if arg_name == arg_name_reg then
-            for i = 1, #arg do
-                if arg[i] == arg_str then
-                    if i + 1 <= #arg then
-                        return arg[i + 1]
-                    else
-                        return nil
-                    end
-                end
-            end
-        end
-    end
-    return nil
 end
 
 -- 从wg配置文件中获取port
@@ -433,7 +449,11 @@ local function gen_bird_conf(peername, peerinfo)
     conf = string.gsub(conf, "<asn>", peerinfo.ASN)
     return conf
 end
+--#endregion
 
+
+
+--#region main functions
 -- 生成peerinfo
 local function do_info()
     if not YourPeerInfo then
@@ -674,8 +694,11 @@ local function do_uninstall()
     log("removing " .. script_name .. " from " .. bin_path, Loglevels.INFO)
     os.execute("rm " .. bin_path)
 end
+--#endregion
 
 
+
+--#region main process
 -- 解析命令行参数
 -- 先处理输入为空的情况
 if not ... then
@@ -766,3 +789,4 @@ elseif arg[1] == "uninstall" then
     do_uninstall()
 end
 os.exit(0)
+--#endregion
