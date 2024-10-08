@@ -506,33 +506,39 @@ local function do_peer()
         log("operating firewall", Loglevels.INFO)
         local fw_zone_name = find_option_with_value("firewall")
         -- mainly from https://github.com/dn-11/luci-network-dn11
-        local uci = require("luci.model.uci").cursor()
-        local zones = uci:get_all("firewall")
-        local vpn_zone
-        for name, zone in pairs(zones) do
-            log("checking firewall zone " .. name, Loglevels.DEBUG)
-            if zone.name == fw_zone_name then
-                vpn_zone = name
-                break
-            elseif zone.name == 'dn11' then
-                vpn_zone = name
-                break
-            elseif zone.name == 'vpn' then
-                vpn_zone = name
-                break
+        local status, uci = pcall(require, "luci.model.uci")
+        if not status then
+            log("failed to require uci... skip the firewall operate", Loglevels.ERROR)
+            log("errmsg: " .. uci, Loglevels.DEBUG)
+        else
+            uci = uci.cursor()
+            local zones = uci:get_all("firewall")
+            local vpn_zone
+            for name, zone in pairs(zones) do
+                log("checking firewall zone " .. name, Loglevels.DEBUG)
+                if zone.name == fw_zone_name then
+                    vpn_zone = name
+                    break
+                elseif zone.name == 'dn11' then
+                    vpn_zone = name
+                    break
+                elseif zone.name == 'vpn' then
+                    vpn_zone = name
+                    break
+                end
             end
-        end
-        if vpn_zone then
-            log("adding interface " .. arg[2] .. " to firewall zone" .. vpn_zone, Loglevels.INFO)
-            local device_list = uci:get("firewall", vpn_zone, "device") or {}
-            table.insert(device_list, arg[2])
-            uci:set_list("firewall", vpn_zone, "device", device_list)
-            uci:commit("firewall")
-            run_shell("/etc/init.d/firewall reload")
+            if vpn_zone then
+                log("adding interface " .. arg[2] .. " to firewall zone" .. vpn_zone, Loglevels.INFO)
+                local device_list = uci:get("firewall", vpn_zone, "device") or {}
+                table.insert(device_list, arg[2])
+                uci:set_list("firewall", vpn_zone, "device", device_list)
+                uci:commit("firewall")
+                run_shell("/etc/init.d/firewall reload")
+            end
         end
     end
     -- 修改wg-quick-op配置文件
-    if find_option("old-wg-quick-op") or OldWGOconf then
+    if OldWGOconf then
         log("modifying wg-quick-op config file", Loglevels.INFO)
         local conf_file = ConfPaths.WQOconf
         if test_file(conf_file) then
@@ -598,6 +604,9 @@ local function do_restore()
     local answer = io.stdin:read()
     if answer == "y" then
         restore(ConfPaths.Birdconf, suffix)
+    end
+    if not OldWGOconf then
+        log("new version of wg-quick-op does not need backup restore", Loglevels.INFO)
     end
     io.stdout:write("\nDo you want to restore the wg-quick-op config file? [y/N]: ")
     answer = io.stdin:read()
@@ -722,6 +731,9 @@ if not test_file(ConfFile) then
     os.exit(2)
 end
 dofile(ConfFile)
+
+-- 处理出现在config中的flag
+OldWGOconf = find_option("old-wg-quick-op") or OldWGOconf
 
 -- 再处理正常的COMMANDS,OPTIONS放到具体的函数中处理
 --[[
