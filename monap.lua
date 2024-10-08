@@ -715,13 +715,19 @@ local function do_install()
     local bin_path = prefix .. "usr/bin/" .. script_name
     run_shell("mkdir -p " .. prefix .. "usr/bin")
     log("installing " .. script_name .. " to " .. bin_path, Loglevels.INFO)
-    run_shell("cp " .. arg[0] .. " " .. bin_path)
+    run_shell("cp -f " .. arg[0] .. " " .. bin_path)
     run_shell("chmod +x " .. bin_path)
     -- 安装conf
     local conf_path_install = prefix .. conf_path .. ConfFile_name
-    run_shell("mkdir -p " .. prefix .. conf_path)
-    log("installing " .. ConfFile .. " to " .. conf_path_install, Loglevels.INFO)
-    run_shell("cp " .. ConfFile .. " " .. conf_path_install)
+    if test_file(conf_path_install) then
+        log("config file already exists", Loglevels.ERROR)
+        log("please check " .. conf_path_install .. " and the " .. ConfFile .. " and update it yourself", Loglevels
+            .ERROR)
+    else
+        run_shell("mkdir -p " .. prefix .. conf_path)
+        log("installing " .. ConfFile .. " to " .. conf_path_install, Loglevels.INFO)
+        run_shell("cp " .. ConfFile .. " " .. conf_path_install)
+    end
 end
 
 -- 卸载monap
