@@ -7,7 +7,7 @@
 
 --#region helper functions 和一些全局变量初始化
 -- 版本号及名称
-local version = "0.1.1"
+local version = "0.1.2"
 local script_name = "monap"
 
 local usage = [[
