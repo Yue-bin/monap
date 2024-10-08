@@ -44,6 +44,7 @@ Usage: ]] .. script_name .. [[ [COMMAND] [NAME] [OPTIONS]
         --no-bird: do not operate bird and config file of bird
         --no-wg: do not operate wireguard and config file of wireguard
         --old-wg-quick-op: use the config file wg-quick-op.yaml
+        --json: output peerinfo with json format
 ]]
 
 -- 输出帮助信息
@@ -170,7 +171,8 @@ local flag_reg = {
     ["--no-fw"] = "no-fw",
     ["--no-bird"] = "no-bird",
     ["--no-wg"] = "no-wg",
-    ["--old-wg-quick-op"] = "old-wg-quick-op"
+    ["--old-wg-quick-op"] = "old-wg-quick-op",
+    ["--json"] = "json"
 }
 
 -- 带值参数注册表
@@ -240,19 +242,16 @@ end
 
 -- 处理一般参数：参数和值都存在时才返回值，否则返回nil
 local function find_option_with_value(arg_name)
-    local matched_arg_str = nil
     for arg_str, arg_name_reg in pairs(arg_reg) do
         if arg_name == arg_name_reg then
-            matched_arg_str = arg_str
-            break
-        end
-    end
-    for i = 1, #arg do
-        if arg[i] == matched_arg_str then
-            if i + 1 <= #arg then
-                return arg[i + 1]
-            else
-                return nil
+            for i = 1, #arg do
+                if arg[i] == arg_str then
+                    if i + 1 <= #arg then
+                        return arg[i + 1]
+                    else
+                        return nil
+                    end
+                end
             end
         end
     end
@@ -352,8 +351,8 @@ local function gen_port_using()
     return portlist
 end
 
--- 解析info生成的peerinfo
-local function parse_info(info)
+-- 解析plain text格式的peerinfo
+local function parse_info_in_plain(info)
     local peerinfo = {}
     for line in info:gmatch("[^\r\n]+") do
         -- 跳过包含 'Peerinfos:' 的行
@@ -364,9 +363,30 @@ local function parse_info(info)
             end
         end
     end
-    -- 检查是否有缺失的字段
-    if not peerinfo.ASN or not peerinfo.IP or not peerinfo.PublicKey then
+    return peerinfo
+end
+
+-- 解析json格式的peerinfo
+local function parse_info_in_json(info)
+    local status, json = pcall(require, "luci.jsonc")
+    if not status then
+        log("failed to require luci.jsonc...", Loglevels.ERROR)
+        log("errmsg: " .. json, Loglevels.DEBUG)
         return nil
+    end
+    local peerinfo, err = json.parse(info)
+    if not peerinfo then
+        log("failed to parse json string", Loglevels.WARN)
+        log("errmsg: " .. err, Loglevels.DEBUG)
+        return nil
+    end
+    return peerinfo
+end
+
+local function check_peerinfo(peerinfo)
+    -- 检查是否有缺失的必要字段
+    if not peerinfo.ASN or not peerinfo.IP or not peerinfo.PublicKey then
+        return false
     end
     -- 检查字段常规合法性
     -- ASN
@@ -389,7 +409,16 @@ local function parse_info(info)
     if #peerinfo.PublicKey ~= 44 then
         log("PublicKey length is not 44 , but " .. #peerinfo.PublicKey, Loglevels.WARN)
     end
-    return peerinfo
+    return true
+end
+
+-- 解析info生成的peerinfo
+local function parse_info(info)
+    local peerinfo = parse_info_in_json(info) or parse_info_in_plain(info)
+    if check_peerinfo(peerinfo) then
+        return peerinfo
+    end
+    return nil
 end
 
 -- 获取可用端口
@@ -460,13 +489,28 @@ local function do_info()
         log("table \"YourPeerInfo\" not found in " .. ConfFile, Loglevels.ERROR)
         os.exit(126)
     end
-    local portlist = gen_port_using()
-    local port = get_port_available(portlist)
-    io.stdout:write("Peerinfos:\n")
-    io.stdout:write("\t" .. "ASN:" .. YourPeerInfo.ASN .. "\n")
-    io.stdout:write("\t" .. "IP:" .. YourPeerInfo.IP .. "\n")
-    io.stdout:write("\t" .. "Endpoint:" .. YourPeerInfo.Endpoint .. ":" .. port .. "\n")
-    io.stdout:write("\t" .. "PublicKey:" .. YourPeerInfo.PublicKey .. "\n")
+    local port = get_port_available(gen_port_using())
+    local peerinfo = {
+        ASN = YourPeerInfo.ASN,
+        IP = YourPeerInfo.IP,
+        Endpoint = YourPeerInfo.Endpoint .. ":" .. port,
+        PublicKey = YourPeerInfo.PublicKey
+    }
+    if find_option("json") then
+        local status, json = pcall(require, "luci.jsonc")
+        if not status then
+            log("failed to require luci.jsonc...", Loglevels.ERROR)
+            log("errmsg: " .. json, Loglevels.DEBUG)
+        else
+            --io.stdout:write("Peerinfos:\n")
+            io.stdout:write(json.stringify(peerinfo, true) .. "\n")
+        end
+    else
+        io.stdout:write("Peerinfos:\n")
+        for k, v in pairs(peerinfo) do
+            io.stdout:write("\t" .. k .. ": " .. v .. "\n")
+        end
+    end
 end
 
 -- 与其他peer建立连接
