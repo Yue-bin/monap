@@ -720,7 +720,7 @@ if find_option("quiet") then
 end
 
 -- 处理--log-level选项
-LOG_LEVEL = find_option_with_value("log-level") or LOG_LEVEL
+LOG_LEVEL = Loglevels[find_option_with_value("log-level")] or LOG_LEVEL
 
 -- 加载配置文件
 -- 其实这里会有一个注入点存在，你可以直接往配置文件里狠狠注入
