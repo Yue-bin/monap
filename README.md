@@ -3,7 +3,7 @@
 autopeer by moncak
 
 > [!WARNING]
->
+> 
 > 非严格意义上的autopeer，只是一个简单的peer工具箱
 
 ~~有人写完才知道autopeer是什么我不说是谁~~
@@ -17,27 +17,35 @@ autopeer by moncak
 ## 功能
 
 * 根据配置文件里的信息生成发送给别人的peerinfo
-* 根据输入的peerinfo自动生成和修改相关的配置文件并执行 `wg-quick-op up <name>`和 `birdc configure`
 
+* 根据输入的peerinfo自动生成和修改相关的配置文件并执行 `wg-quick-op up <name>`和 `birdc configure`
+  
   * 并添加接口到指定的防火墙区域或者 `dn11`或 `vpn`区域
   * 以及对输入的peerinfo进行一些基本的检查
   * 目前支持JSON格式peerinfo输入输出
+
 * (部分)支持旧版使用 `wg-quick-op.yaml`配置文件的 `wg-quick-op`
-
+  
   *新版可以直接忽略了所以就直接抄了旧版的代码也懒得维护*
+
 * 显示某个连接的相关信息
-
+  
   *其实就是打印 `wg show <name>`和 `birdc show protocol <name>`但是可以一起watch诶不香吗）*
+
 * 显示所有已经被使用的端口
-
+  
   *貌似 `wg-quick-op`支持来着但是我忘记是什么了就）*
+
 * 按照配置文件给定的 `PortGenMethod`和正在使用中的端口自动选择新使用的端口
-
+  
   也可手动使用 `-p`或 `--port`指定
-
+  
   **当不存在正在使用的端口的时候必须手动指定**
+
 * 提供还原备份功能
+
 * 安装与卸载，可以指定可选的 `--prefix`参数
+
 * TODO: 检查连接，自动化排障
 
 ## 用法
@@ -108,7 +116,7 @@ DEMO：
 
 ```shell
 ╰─± git clone https://github.com/Yue-bin/monap
-	...
+    ...
 
 ╰─± ./monap.lua install
 [INFO] config file found: ./etc/monap/config.lua
