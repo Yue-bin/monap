@@ -78,9 +78,13 @@ Usage: monap [COMMAND] [NAME] [OPTIONS]
         --fwmark <fwmark>: specify the fwmark (default: none)
         --mtu <mtu>: specify the mtu (default: 1388)
         --keepalive <keepalive>: specify the keepalive (default: none)
+        --fw <firewall>: specify the firewall zone name (default: dn11/vpn)
+        --no-fw: do not operate firewall
+            will not affect the fwmark option
         --no-bird: do not operate bird and config file of bird
         --no-wg: do not operate wireguard and config file of wireguard
         --old-wg-quick-op: use the config file wg-quick-op.yaml
+        --json: output peerinfo with json format
 ```
 
 其中peerinfo的示例如下：
