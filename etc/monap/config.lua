@@ -55,6 +55,12 @@ OldWGOconf = false
 -- to enable(or not) the pretty-json format
 PrettyJson = true
 
+-- port range that can be managed by monap, if not set it will be all
+-- can be set just min or max
+PortRange = {
+    Min = 0,
+    Max = 65535
+}
 
 -- config templates
 -- 对于每一个<foo>,如果对应的foo存在于替换列表中,都会被替换为foo对应的值

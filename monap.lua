@@ -343,7 +343,12 @@ local function gen_port_using()
             local iname = filename:match(string.format(ConfPaths.WGconf_str, "(.*)"))
             local port = get_port_from_wgconf(filename)
             if port then
-                table.insert(portlist, { iname, port })
+                port = tonumber(port)
+                if port >= PortRange.Min and port <= PortRange.Max then
+                    table.insert(portlist, { iname, port })
+                else
+                    log("port " .. port .. " from file " .. filename .. " is out of range, ignore it", Loglevels.INFO)
+                end
             end
         end
     end
@@ -422,9 +427,10 @@ local function parse_info(info)
 end
 
 -- 获取可用端口
-local function get_port_available(portlist)
+local function get_port_available()
     local port = find_option_with_value("port")
     if not port then
+        local portlist = gen_port_using()
         if not portlist or #portlist < 1 then
             log("no port in use, please specify the port", Loglevels.ERROR)
             os.exit(6)
@@ -439,6 +445,10 @@ local function get_port_available(portlist)
                 os.exit(3)
             end
         end
+    end
+    port = tonumber(port)
+    if port < PortRange.Min or port > PortRange.Max then
+        log("port " .. port .. " is out of setted range", Loglevels.WARN)
     end
     return port
 end
@@ -489,7 +499,7 @@ local function do_info()
         log("table \"YourPeerInfo\" not found in " .. ConfFile, Loglevels.ERROR)
         os.exit(126)
     end
-    local port = get_port_available(gen_port_using())
+    local port = get_port_available()
     local peerinfo = {
         ASN = YourPeerInfo.ASN,
         IP = YourPeerInfo.IP,
@@ -532,7 +542,7 @@ local function do_peer()
         log("invalid info string", Loglevels.ERROR)
         os.exit(5)
     end
-    local port = get_port_available(gen_port_using())
+    local port = get_port_available()
     local fwmark = find_option_with_value("fwmark")
     local mtu = find_option_with_value("mtu")
     local keepalive = find_option_with_value("keepalive")
@@ -810,6 +820,10 @@ if not test_file(ConfFile) then
     os.exit(2)
 end
 dofile(ConfFile)
+-- 处理一下默认值
+PortRange = PortRange or {}
+PortRange.Min = PortRange.Min or 0
+PortRange.Max = PortRange.Max or 65535
 
 -- 因为手动指定的log-level应凌驾于配置文件中的log-level之上，所以再处理一次
 -- 处理--log-level选项
