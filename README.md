@@ -48,6 +48,16 @@ autopeer by moncak
 
 * TODO: 检查连接，自动化排障
 
+## 安装
+
+```bash
+git clone https://github.com/Yue-bin/monap.git	#或者也可以从release里下载，但是release通常会落后一点
+cd monap
+./monap.lua install
+```
+
+然后自行修改`/etc/monap/config.lua`为你的配置和peer信息
+
 ## 用法
 
 ```bash
