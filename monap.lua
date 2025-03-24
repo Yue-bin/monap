@@ -91,14 +91,19 @@ local function log(msg, level)
         -- INFO及以上用stdout,其他用stderr
         if level <= Loglevels.INFO then
             io.stdout:write("[" .. Loglevels[level] .. "]")
+            io.stdout:write(" " .. msg .. "\n")
+            io.stdout:flush()
         else
             io.stderr:write("[" .. Loglevels[level] .. "]")
+            io.stderr:write(" " .. msg .. "\n")
+            io.stderr:flush()
         end
     else
         -- 默认INFO
         io.stdout:write("[INFO]")
+        io.stdout:write(" " .. msg .. "\n")
+        io.stdout:flush()
     end
-    io.stdout:write(" " .. msg .. "\n")
     return true
 end
 
