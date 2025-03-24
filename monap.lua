@@ -491,7 +491,6 @@ end
 --#endregion
 
 
-
 --#region main functions
 -- 生成peerinfo
 local function do_info()
@@ -529,6 +528,9 @@ local function do_info()
     end
 end
 
+
+-- 如果检查失败要用到恢复，先声明一下
+local do_restore
 -- 与其他peer建立连接
 local function do_peer()
     -- 读取info与预检查
@@ -671,14 +673,23 @@ local function do_peer()
         --bird和birdc都没有-t选项，我有一些错误的记忆
         --log("testing bird config file", Loglevels.INFO)
         --run_shell("bird -t -c " .. conf_file)
-        -- 重启bird
-        log("reconfiguring bird", Loglevels.INFO)
-        run_shell("birdc configure")
+        log("testing bird config file", Loglevels.INFO)
+        local result = run_shell("birdc configure check")
+        if string.match(result, "Configuration OK") then
+            -- 重启bird
+            log("reconfiguring bird", Loglevels.INFO)
+            run_shell("birdc configure")
+        else
+            log("bird config file is invalid, here's output of bird", Loglevels.ERROR)
+            io.stderr:write(result)
+            log("enter the restore mode", Loglevels.INFO)
+            do_restore()
+        end
     end
 end
 
 -- 恢复配置文件
-local function do_restore()
+function do_restore()
     local suffix = find_option_with_value("suffix") or "bak"
     io.stdout:write("Do you want to restore the bird config file? [y/N]: ")
     local answer = io.stdin:read()
