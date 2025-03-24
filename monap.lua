@@ -10,18 +10,18 @@
 local version = "0.1.2"
 local script_name = "monap"
 
-local usage = [[
-monap is a script for autopeer
+local usage =
+script_name .. [[ is a script for autopeer
 Usage: ]] .. script_name .. [[ [COMMAND] [NAME] [OPTIONS]
     Commands:
         info: genarate the peerinfo
         peer: peer with others
-        restore: restore the config file save by monap
+        restore: restore the config file save by ]] .. script_name .. [[
         test: test the connection
         show: show the status of the connection
         showport: show the port in use
-        install: install the monap and config file
-        uninstall: remove the monap and (optional) config file
+        install: install the ]] .. script_name .. [[ and config file
+        uninstall: remove the ]] .. script_name .. [[ and (optional) config file
     NAME:
         the name of the peer
     Options:
