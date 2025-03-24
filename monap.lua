@@ -58,6 +58,9 @@ local function print_version()
     io.stderr:write(script_name .. " " .. version)
 end
 
+-- 把所有标准流的输出改为立即刷新
+io.stdout:setvbuf("no")
+io.stderr:setvbuf("no")
 
 -- 日志相关初始化
 -- 搬了一点monlog,因为希望在单文件的情况下尽量减少依赖
@@ -92,17 +95,14 @@ local function log(msg, level)
         if level <= Loglevels.INFO then
             io.stdout:write("[" .. Loglevels[level] .. "]")
             io.stdout:write(" " .. msg .. "\n")
-            io.stdout:flush()
         else
             io.stderr:write("[" .. Loglevels[level] .. "]")
             io.stderr:write(" " .. msg .. "\n")
-            io.stderr:flush()
         end
     else
         -- 默认INFO
         io.stdout:write("[INFO]")
         io.stdout:write(" " .. msg .. "\n")
-        io.stdout:flush()
     end
     return true
 end
