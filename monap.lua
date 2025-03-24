@@ -704,7 +704,7 @@ function do_restore()
     if not OldWGOconf then
         log("new version of wg-quick-op does not need backup restore", Loglevels.INFO)
     end
-    io.stdout:write("\nDo you want to restore the wg-quick-op config file? [y/N]: ")
+    io.stdout:write("Do you want to restore the wg-quick-op config file? [y/N]: ")
     answer = io.stdin:read()
     print(answer)
     if answer == "y" then
