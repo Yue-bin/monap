@@ -607,16 +607,18 @@ local function do_peer()
             local zones = uci:get_all("firewall")
             local vpn_zone
             for name, zone in pairs(zones) do
-                log("checking firewall zone " .. name, Loglevels.DEBUG)
-                if zone.name == fw_zone_name then
-                    vpn_zone = name
-                    break
-                elseif zone.name == 'dn11' then
-                    vpn_zone = name
-                    break
-                elseif zone.name == 'vpn' then
-                    vpn_zone = name
-                    break
+                if zone[".type"] == "zone" then
+                    log("checking firewall zone " .. name, Loglevels.DEBUG)
+                    if zone.name == fw_zone_name then
+                        vpn_zone = name
+                        break
+                    elseif zone.name == 'dn11' then
+                        vpn_zone = name
+                        break
+                    elseif zone.name == 'vpn' then
+                        vpn_zone = name
+                        break
+                    end
                 end
             end
             if vpn_zone then
