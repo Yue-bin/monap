@@ -11,7 +11,7 @@ local version = "0.1.2"
 local script_name = "monap"
 
 local usage =
-script_name .. [[ is a script for autopeer
+    script_name .. [[ is a script for autopeer
 Usage: ]] .. script_name .. [[ [COMMAND] [NAME] [OPTIONS]
     Commands:
         info: genarate the peerinfo
@@ -398,6 +398,8 @@ local function check_peerinfo(peerinfo)
     if not peerinfo.ASN or not peerinfo.IP or not peerinfo.PublicKey then
         return false
     end
+    -- 填充可空字段
+    peerinfo.Endpoint = peerinfo.Endpoint or ""
     -- 检查字段常规合法性
     -- ASN
     -- dn11的ASN长度一般是10
@@ -414,6 +416,9 @@ local function check_peerinfo(peerinfo)
     -- Endpoint
     if not peerinfo.Endpoint:match("^[%a%d%-%.]+:%d+$") then
         log("not a common Endpoint", Loglevels.WARN)
+    end
+    if not peerinfo.Endpoint == "" then
+        log("Empty Endpoint", Loglevels.WARN)
     end
     -- PublicKey
     if #peerinfo.PublicKey ~= 44 then
