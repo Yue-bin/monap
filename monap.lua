@@ -417,7 +417,7 @@ local function check_peerinfo(peerinfo)
     if not peerinfo.Endpoint:match("^[%a%d%-%.]+:%d+$") then
         log("not a common Endpoint", Loglevels.WARN)
     end
-    if not peerinfo.Endpoint == "" then
+    if peerinfo.Endpoint == "" then
         log("Empty Endpoint", Loglevels.WARN)
     end
     -- PublicKey
