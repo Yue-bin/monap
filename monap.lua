@@ -476,11 +476,11 @@ local function get_port_available()
             end
         end
     end
-    port = tonumber(port)
-    if port < PortRange.Min or port > PortRange.Max then
-        log("port " .. port .. " is out of setted range", Loglevels.WARN)
+    local portnumber = tonumber(port)
+    if portnumber < PortRange.Min or portnumber > PortRange.Max then
+        log("port " .. portnumber .. " is out of setted range", Loglevels.WARN)
     end
-    return port
+    return portnumber
 end
 
 -- 生成wireguard配置文件
