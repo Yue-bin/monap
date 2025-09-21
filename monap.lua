@@ -58,9 +58,9 @@ local function print_version()
     io.stderr:write(script_name .. " " .. version)
 end
 
--- 把所有标准流的输出改为立即刷新
-io.stdout:setvbuf("no")
-io.stderr:setvbuf("no")
+-- 把所有标准流的输出改为按行刷新
+io.stdout:setvbuf("line")
+io.stderr:setvbuf("line")
 
 -- 日志相关初始化
 -- 搬了一点monlog,因为希望在单文件的情况下尽量减少依赖
@@ -141,6 +141,28 @@ local function run_shell(cmd)
     return s
 end
 
+-- 生成类似 是否需要使用xx[Y/n] 的交互式提问
+--- @param question string
+--- @param default boolean
+local function ask_yes_no(question, default)
+    local answer
+    if default then
+        io.stdout:write(question .. " [Y/n]: ")
+    else
+        io.stdout:write(question .. " [y/N]: ")
+    end
+    io.stdout:flush()
+    answer = io.stdin:read()
+        :gsub("^%s*(.-)%s*$", "%1") -- trim whitespace
+        :lower()                    -- to lower case
+    if answer == "" then
+        return default
+    end
+    if answer == "y" then
+        return true
+    end
+    return false
+end
 
 -- 参数处理相关初始化
 -- 把参数拼接成字符串方便查找参数
@@ -301,9 +323,7 @@ local function backup(conf, suffix)
         suffix = "bak"
     end
     if test_file(conf .. suffix) then
-        io.stdout:write("backup file already exists, do you want to overwrite it? [y/N]: ")
-        local answer = io.stdin:read()
-        if answer ~= "y" then
+        if ask_yes_no("Backup file already exists, do you want to overwrite it?", false) then
             return
         end
     end
@@ -498,6 +518,7 @@ local function gen_bird_conf(peername, peerinfo)
     conf = string.gsub(conf, "<asn>", peerinfo.ASN)
     return conf
 end
+
 --#endregion
 
 
@@ -573,7 +594,9 @@ local function do_peer()
     if keepalive then
         log("Keepalive: " .. keepalive, Loglevels.INFO)
     end
-    io.stdout:write("if the peer info is correct, press any key to continue, or press Ctrl+C to exit\n")
+    if not ask_yes_no("Do you want to continue?", true) then
+        os.exit(1)
+    end
     local _ = io.stdin:read()
     -- 生成wg配置文件
     if not find_option("no-wg") then
@@ -703,19 +726,14 @@ end
 -- 恢复配置文件
 function do_restore()
     local suffix = find_option_with_value("suffix") or "bak"
-    io.stdout:write("Do you want to restore the bird config file? [y/N]: ")
-    local answer = io.stdin:read()
-    if answer == "y" then
+    if ask_yes_no("Do you want to restore the bird config file?", false) then
         restore(ConfPaths.Birdconf, suffix)
     end
     if not OldWGOconf then
         log("new version of wg-quick-op does not need backup restore", Loglevels.INFO)
     end
     if find_option("no-wg-quick-op") then
-        io.stdout:write("Do you want to restore the wg-quick-op config file? [y/N]: ")
-        answer = io.stdin:read()
-        print(answer)
-        if answer == "y" then
+        if ask_yes_no("Do you want to restore the wg-quick-op config file?", false) then
             restore(ConfPaths.WQOconf, suffix)
         end
         log("config file restored", Loglevels.INFO)
@@ -771,10 +789,7 @@ end
 local function do_uninstall()
     -- 解析prefix
     local prefix = find_option_with_value("prefix") or "/"
-    io.stdout:write("Do you want to remove the config file? [y/N]: ")
-    io.stdout:flush()
-    local answer = io.stdin:read()
-    if answer == "y" then
+    if ask_yes_no("Do you want to remove the config file?", false) then
         -- 卸载conf
         local conf_path_install = prefix .. conf_path .. ConfFile_name
         log("removing " .. ConfFile_name .. " from " .. conf_path_install, Loglevels.INFO)
