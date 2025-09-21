@@ -171,6 +171,9 @@ for i = 1, #arg do
     ArgString = ArgString .. arg[i]
 end
 
+-- 接口名直接存全局好了
+local if_name = arg[2]
+
 -- 命令注册表
 local cmd_reg = {
     ["info"] = "info",
@@ -259,7 +262,7 @@ local function find_option(arg_name)
     for arg_str, arg_name_reg in pairs(flag_reg) do
         if arg_name == arg_name_reg then
             -- 再查实际的参数列表
-            if string.find(ArgString, arg_str, 1, true) then
+            if ArgString:find(arg_str, 1, true) then
                 return true
             end
         end
@@ -286,6 +289,21 @@ local function find_option_with_value(arg_name)
 end
 
 
+-- 防火墙相关默认值
+local default_fw_zone_list = {
+    "dn11",
+    "vpn"
+}
+
+local function is_default_fw_zone(zone)
+    for i = 1, #default_fw_zone_list do
+        if zone == default_fw_zone_list[i] then
+            return true
+        end
+    end
+    return false
+end
+
 -- 搜索配置文件
 local function search_conf()
     local path = ""
@@ -308,6 +326,16 @@ local function search_conf()
     return path
 end
 
+-- 安全的require
+local function safe_require(mod)
+    local status, res = pcall(require, mod)
+    if not status then
+        log("failed to require " .. mod .. "...", Loglevels.ERROR)
+        log("errmsg: " .. res, Loglevels.DEBUG)
+        return nil
+    end
+    return res
+end
 
 -- 一些不那么基础的功能性的helper函数
 -- 备份配置文件,不指定后缀则默认为bak
@@ -387,7 +415,7 @@ local function parse_info_in_plain(info)
     for line in info:gmatch("[^\r\n]+") do
         -- 跳过包含 'Peerinfos:' 的行
         if not line:find("Peerinfos:") then
-            local key, value = line:match("(%a+)%s*:%s*(.+)")
+            local key, value = line:match("(%a+)%s*:%s(.+)")
             if key and value then
                 peerinfo[key] = value
             end
@@ -398,10 +426,8 @@ end
 
 -- 解析json格式的peerinfo
 local function parse_info_in_json(info)
-    local status, json = pcall(require, "luci.jsonc")
-    if not status then
-        log("failed to require luci.jsonc...", Loglevels.ERROR)
-        log("errmsg: " .. json, Loglevels.DEBUG)
+    local json = safe_require("luci.jsonc")
+    if not json then
         return nil
     end
     local peerinfo, err = json.parse(info)
@@ -487,36 +513,154 @@ end
 local function gen_wg_conf(peerinfo, port, fwmark, mtu, keepalive)
     -- 从模板进行那个超级大替换啊
     -- 先处理必选项
-    local conf = string.gsub(WGConfT, "<pri_key>", YourPeerInfo.PrivateKey)
-    conf = string.gsub(conf, "<port>", port)
-    conf = string.gsub(conf, "<local_ip>", YourPeerInfo.IP)
-    conf = string.gsub(conf, "<peer_ip>", peerinfo.IP)
-    conf = string.gsub(conf, "<mtu>", mtu or "1388")
-    conf = string.gsub(conf, "<pub_key>", peerinfo.PublicKey)
+    local conf = WGConfT:gsub("<pri_key>", YourPeerInfo.PrivateKey)
+        :gsub("<port>", port)
+        :gsub("<local_ip>", YourPeerInfo.IP)
+        :gsub("<peer_ip>", peerinfo.IP)
+        :gsub("<mtu>", mtu or "1388")
+        :gsub("<pub_key>", peerinfo.PublicKey)
     -- 然后处理可选项,替换并取消注释
     if fwmark then
         -- 我草了copylot这个匹配替换的思路简直是天才
         -- 就是他可能不太知道我匹配的具体情况还得改
-        conf = string.gsub(conf, "#%s*([^\n\r]-fwmark.-[\n\r])", "%1")
-        conf = string.gsub(conf, "<fwmark>", fwmark)
+        conf = conf:gsub("#%s*([^\n\r]-fwmark.-[\n\r])", "%1")
+            :gsub("<fwmark>", fwmark)
     end
     if peerinfo.Endpoint ~= "" then
-        conf = string.gsub(conf, "#%s*([^\n\r]-endpoint.-[\n\r])", "%1")
-        conf = string.gsub(conf, "<endpoint>", peerinfo.Endpoint)
+        conf = conf:gsub("#%s*([^\n\r]-endpoint.-[\n\r])", "%1")
+            :gsub("<endpoint>", peerinfo.Endpoint)
     end
     if keepalive then
-        conf = string.gsub(conf, "#%s*([^\n\r]-keepalive.-[\n\r])", "%1")
-        conf = string.gsub(conf, "<keepalive>", keepalive)
+        conf = conf:gsub("#%s*([^\n\r]-keepalive.-[\n\r])", "%1")
+            :gsub("<keepalive>", keepalive)
     end
     return conf
 end
 
+-- 写入wireguard配置文件
+local function write_wg_conf_file(conf_content)
+    local conf_file = string.format(ConfPaths.WGconf_str, if_name)
+    if test_file(conf_file) then
+        backup(conf_file)
+    end
+    local conf = io.open(conf_file, "w")
+    if not conf then
+        log("failed to open " .. conf_file, Loglevels.ERROR)
+    else
+        conf:write(conf_content)
+        conf:close()
+    end
+end
+
 -- 生成bird配置文件
 local function gen_bird_conf(peername, peerinfo)
-    local conf = string.gsub(BirdConfT, "<name>", peername)
-    conf = string.gsub(conf, "<peer_ip>", peerinfo.IP)
-    conf = string.gsub(conf, "<asn>", peerinfo.ASN)
+    local conf = BirdConfT:gsub("<name>", peername)
+        :gsub("<peer_ip>", peerinfo.IP)
+        :gsub("<asn>", peerinfo.ASN)
     return conf
+end
+
+-- 将接口添加到防火墙
+local function add_if_to_firewall()
+    log("operating firewall", Loglevels.INFO)
+    local fw_zone_name = find_option_with_value("firewall")
+    -- mainly from https://github.com/dn-11/luci-network-dn11
+    local uci = safe_require("luci.model.uci")
+    if not uci then
+        log("failed to require uci... skip the firewall operate", Loglevels.ERROR)
+        return
+    end
+    uci = uci.cursor()
+    local zones = uci:get_all("firewall")
+    local vpn_zone
+    for name, zone in pairs(zones) do
+        if zone[".type"] == "zone" then
+            log("checking firewall zone " .. name, Loglevels.DEBUG)
+            if zone.name == fw_zone_name then
+                vpn_zone = name
+                break
+            elseif is_default_fw_zone(zone.name) then
+                vpn_zone = name
+                break
+            end
+        end
+    end
+    if vpn_zone then
+        log("adding interface " .. if_name .. " to firewall zone" .. vpn_zone, Loglevels.INFO)
+        local device_list = uci:get("firewall", vpn_zone, "device") or {}
+        table.insert(device_list, if_name)
+        uci:set_list("firewall", vpn_zone, "device", device_list)
+        uci:commit("firewall")
+        run_shell("/etc/init.d/firewall reload")
+    end
+end
+
+-- 修改旧版wg-quick-op配置文件
+local function modify_wg_quick_op_old()
+    log("modifying wg-quick-op config file", Loglevels.INFO)
+    local conf_file = ConfPaths.WQOconf
+    if test_file(conf_file) then
+        backup(conf_file)
+    end
+    -- 这一段直接从旧版抄的，由于新版中已经失去了这个功能，所以我也不打算维护了
+    --read conf to string
+    local conf = io.open(ConfPaths.WQOconf, "r")
+
+    if not conf then
+        log("failed to open " .. conf_file, Loglevels.ERROR)
+    else
+        conf:seek("set", 0)
+        local conftext = conf:read("*a")
+            :gsub("enabled:", string.format("enabled:\n  - %s", if_name)) --find "enabled:" and insert peername
+            :gsub("iface:", string.format("iface:\n    - %s", if_name))   --find "iface:" insert peername
+        conf:close()
+
+        --write it to file
+        local conf = io.open(ConfPaths.WQOconf, "w")
+        if not conf then
+            log("failed to open " .. conf_file, Loglevels.ERROR)
+        else
+            conf:write(conftext)
+            conf:close()
+        end
+    end
+    -- 重启wg-quick-op
+    log("restarting wg-quick-op", Loglevels.INFO)
+    run_shell("service wg-quick-op restart")
+end
+
+-- 如果检查失败要用到恢复，先声明一下
+local do_restore
+-- 修改bird配置文件
+local function modify_bird_conf(conf_content)
+    log("modifying bird config file", Loglevels.INFO)
+    local conf_file = ConfPaths.Birdconf
+    if test_file(conf_file) then
+        backup(conf_file)
+    end
+    local conf = io.open(conf_file, "a")
+    if not conf then
+        log("failed to open " .. conf_file, Loglevels.ERROR)
+    else
+        conf:write(conf_content)
+        conf:close()
+    end
+    -- 测试配置文件
+    --bird和birdc都没有-t选项，我有一些错误的记忆
+    --log("testing bird config file", Loglevels.INFO)
+    --run_shell("bird -t -c " .. conf_file)
+    log("testing bird config file", Loglevels.INFO)
+    local result = run_shell("birdc configure check")
+    if result:match("Configuration OK") then
+        -- 重启bird
+        log("reconfiguring bird", Loglevels.INFO)
+        run_shell("birdc configure")
+    else
+        log("bird config file is invalid, here's output of bird", Loglevels.ERROR)
+        io.stderr:write(result)
+        log("enter the restore mode", Loglevels.INFO)
+        do_restore()
+    end
 end
 
 --#endregion
@@ -537,11 +681,8 @@ local function do_info()
         PublicKey = YourPeerInfo.PublicKey
     }
     if find_option("json") then
-        local status, json = pcall(require, "luci.jsonc")
-        if not status then
-            log("failed to require luci.jsonc...", Loglevels.ERROR)
-            log("errmsg: " .. json, Loglevels.DEBUG)
-        else
+        local json = safe_require("luci.jsonc")
+        if json then
             --io.stdout:write("Peerinfos:\n")
             if PrettyJson == nil then
                 io.stdout:write(json.stringify(peerinfo, true) .. "\n")
@@ -559,9 +700,6 @@ local function do_info()
     end
 end
 
-
--- 如果检查失败要用到恢复，先声明一下
-local do_restore
 -- 与其他peer建立连接
 local function do_peer()
     -- 读取info与预检查
@@ -579,7 +717,7 @@ local function do_peer()
     local fwmark = find_option_with_value("fwmark")
     local mtu = find_option_with_value("mtu")
     local keepalive = find_option_with_value("keepalive")
-    log("peer with " .. arg[2] .. " with info", Loglevels.INFO)
+    log("peer with " .. if_name .. " with info", Loglevels.INFO)
     log("ASN: " .. peerinfo.ASN, Loglevels.INFO)
     log("IP: " .. peerinfo.IP, Loglevels.INFO)
     log("Endpoint: " .. peerinfo.Endpoint, Loglevels.INFO)
@@ -597,129 +735,21 @@ local function do_peer()
     if not ask_yes_no("Do you want to continue?", true) then
         os.exit(1)
     end
-    local _ = io.stdin:read()
     -- 生成wg配置文件
     if not find_option("no-wg") then
-        log("generating wireguard config file", Loglevels.INFO)
-        local conf_file = string.format(ConfPaths.WGconf_str, arg[2])
-        if test_file(conf_file) then
-            backup(conf_file)
-        end
-        local conf = io.open(conf_file, "w")
-        if not conf then
-            log("failed to open " .. conf_file, Loglevels.ERROR)
-        else
-            conf:write(gen_wg_conf(peerinfo, port, fwmark, mtu, keepalive))
-            conf:close()
-        end
-        -- up这个接口
-        log("up the wireguard interface", Loglevels.INFO)
-        run_shell("wg-quick-op up " .. arg[2])
+        write_wg_conf_file(gen_wg_conf(peerinfo, port, fwmark, mtu, keepalive))
     end
     -- 修改防火墙
     if not find_option("no-fw") then
-        log("operating firewall", Loglevels.INFO)
-        local fw_zone_name = find_option_with_value("firewall")
-        -- mainly from https://github.com/dn-11/luci-network-dn11
-        local status, uci = pcall(require, "luci.model.uci")
-        if not status then
-            log("failed to require uci... skip the firewall operate", Loglevels.ERROR)
-            log("errmsg: " .. uci, Loglevels.DEBUG)
-        else
-            uci = uci.cursor()
-            local zones = uci:get_all("firewall")
-            local vpn_zone
-            for name, zone in pairs(zones) do
-                if zone[".type"] == "zone" then
-                    log("checking firewall zone " .. name, Loglevels.DEBUG)
-                    if zone.name == fw_zone_name then
-                        vpn_zone = name
-                        break
-                    elseif zone.name == 'dn11' then
-                        vpn_zone = name
-                        break
-                    elseif zone.name == 'vpn' then
-                        vpn_zone = name
-                        break
-                    end
-                end
-            end
-            if vpn_zone then
-                log("adding interface " .. arg[2] .. " to firewall zone" .. vpn_zone, Loglevels.INFO)
-                local device_list = uci:get("firewall", vpn_zone, "device") or {}
-                table.insert(device_list, arg[2])
-                uci:set_list("firewall", vpn_zone, "device", device_list)
-                uci:commit("firewall")
-                run_shell("/etc/init.d/firewall reload")
-            end
-        end
+        add_if_to_firewall()
     end
     -- 修改wg-quick-op配置文件
     if OldWGOconf then
-        log("modifying wg-quick-op config file", Loglevels.INFO)
-        local conf_file = ConfPaths.WQOconf
-        if test_file(conf_file) then
-            backup(conf_file)
-        end
-        -- 这一段直接从旧版抄的，由于新版中已经失去了这个功能，所以我也不打算维护了
-        --read conf to string
-        local conf = io.open(ConfPaths.WQOconf, "r")
-
-        if not conf then
-            log("failed to open " .. conf_file, Loglevels.ERROR)
-        else
-            conf:seek("set", 0)
-            local conftext = conf:read("*a")
-            conf:close()
-
-            --find "enabled:" and insert peername
-            conftext = string.gsub(conftext, "enabled:", string.format("enabled:\n  - %s", arg[2]))
-            --find "iface:" insert peername
-            conftext = string.gsub(conftext, "iface:", string.format("iface:\n    - %s", arg[2]))
-
-            --write it to file
-            local conf = io.open(ConfPaths.WQOconf, "w")
-            if not conf then
-                log("failed to open " .. conf_file, Loglevels.ERROR)
-            else
-                conf:write(conftext)
-                conf:close()
-            end
-        end
-        -- 重启wg-quick-op
-        log("restarting wg-quick-op", Loglevels.INFO)
-        run_shell("service wg-quick-op restart")
+        modify_wg_quick_op_old()
     end
     -- 修改bird配置文件
     if not find_option("no-bird") then
-        log("modifying bird config file", Loglevels.INFO)
-        local conf_file = ConfPaths.Birdconf
-        if test_file(conf_file) then
-            backup(conf_file)
-        end
-        local conf = io.open(conf_file, "a")
-        if not conf then
-            log("failed to open " .. conf_file, Loglevels.ERROR)
-        else
-            conf:write(gen_bird_conf(arg[2], peerinfo))
-            conf:close()
-        end
-        -- 测试配置文件
-        --bird和birdc都没有-t选项，我有一些错误的记忆
-        --log("testing bird config file", Loglevels.INFO)
-        --run_shell("bird -t -c " .. conf_file)
-        log("testing bird config file", Loglevels.INFO)
-        local result = run_shell("birdc configure check")
-        if string.match(result, "Configuration OK") then
-            -- 重启bird
-            log("reconfiguring bird", Loglevels.INFO)
-            run_shell("birdc configure")
-        else
-            log("bird config file is invalid, here's output of bird", Loglevels.ERROR)
-            io.stderr:write(result)
-            log("enter the restore mode", Loglevels.INFO)
-            do_restore()
-        end
+        modify_bird_conf(gen_bird_conf(if_name, peerinfo))
     end
 end
 
@@ -749,9 +779,9 @@ end
 
 -- 显示连接状态
 local function do_show()
-    io.stdout:write("this function assume that all the interfaces is named " .. arg[2] .. "\n")
-    io.stdout:write(run_shell("wg show " .. arg[2]) .. "\n")
-    io.stdout:write(run_shell("birdc show protocol " .. arg[2]) .. "\n")
+    io.stdout:write("this function assume that all the interfaces is named " .. if_name .. "\n")
+    io.stdout:write(run_shell("wg show " .. if_name) .. "\n")
+    io.stdout:write(run_shell("birdc show protocol " .. if_name) .. "\n")
 end
 
 -- 显示端口使用情况
