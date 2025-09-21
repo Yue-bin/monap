@@ -387,7 +387,7 @@ local function parse_info_in_plain(info)
     for line in info:gmatch("[^\r\n]+") do
         -- 跳过包含 'Peerinfos:' 的行
         if not line:find("Peerinfos:") then
-            local key, value = line:match("(%a+)%s+:%s+(.+)")
+            local key, value = line:match("(%a+)%s*:%s*(.+)")
             if key and value then
                 peerinfo[key] = value
             end
