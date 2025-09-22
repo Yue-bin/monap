@@ -732,7 +732,7 @@ local function do_peer()
     if keepalive then
         log("Keepalive: " .. keepalive, Loglevels.INFO)
     end
-    if not ask_yes_no("Do you want to continue?", true) then
+    if not ask_yes_no("Do you want to continue?", false) then
         os.exit(1)
     end
     -- 生成wg配置文件
