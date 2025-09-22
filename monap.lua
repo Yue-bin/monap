@@ -164,13 +164,6 @@ local function ask_yes_no(question, default)
     return false
 end
 
--- 参数处理相关初始化
--- 把参数拼接成字符串方便查找参数
-ArgString = ""
-for i = 1, #arg do
-    ArgString = ArgString .. arg[i]
-end
-
 -- 接口名直接存全局好了
 local if_name = arg[2]
 
@@ -262,8 +255,10 @@ local function find_option(arg_name)
     for arg_str, arg_name_reg in pairs(flag_reg) do
         if arg_name == arg_name_reg then
             -- 再查实际的参数列表
-            if ArgString:find(arg_str, 1, true) then
-                return true
+            for i = 1, #arg do
+                if arg[i] == arg_str then
+                    return true
+                end
             end
         end
     end
