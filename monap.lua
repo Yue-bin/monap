@@ -733,13 +733,16 @@ local function do_peer()
     -- 生成wg配置文件
     if not find_option("no-wg") then
         write_wg_conf_file(gen_wg_conf(peerinfo, port, fwmark, mtu, keepalive))
+        -- up这个接口
+        log("up the wireguard interface", Loglevels.INFO)
+        run_shell("wg-quick-op up " .. if_name)
     end
     -- 修改防火墙
     if not find_option("no-fw") then
         add_if_to_firewall()
     end
     -- 修改wg-quick-op配置文件
-    if OldWGOconf then
+    if find_option("old-wg-quick-op") or OldWGOconf then
         modify_wg_quick_op_old()
     end
     -- 修改bird配置文件
