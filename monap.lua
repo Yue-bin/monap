@@ -779,7 +779,7 @@ end
 local function do_show()
     io.stdout:write("this function assume that all the interfaces is named " .. if_name .. "\n")
     io.stdout:write(run_shell("wg show " .. if_name) .. "\n")
-    io.stdout:write(run_shell("birdc show protocol " .. if_name) .. "\n")
+    io.stdout:write(run_shell("birdc show protocol all " .. if_name) .. "\n")
 end
 
 -- 显示端口使用情况
